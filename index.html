@@ -803,7 +803,9 @@ function confirmExercises() {
 function renderWorkout() {
   const p = getPart(workoutData.partId);
   document.getElementById('w-title').textContent = workoutData.editingId ? p.name+' (編輯)' : p.name;
-  document.getElementById('btn-finish').textContent = workoutData.editingId ? '✓ 儲存修改' : '✓ 完成訓練';
+  const finBtn = document.getElementById('btn-finish');
+  finBtn.disabled = false;
+  finBtn.textContent = workoutData.editingId ? '✓ 儲存修改' : '✓ 完成訓練';
   if(workoutData.editingId) {
     document.getElementById('w-time').textContent = fmtDur(workoutData.originalDuration);
   }
@@ -962,7 +964,10 @@ async function syncToNotion(record) {
   const detail=(record.exercises||[]).map(ex=>ex.name+'：'+ex.sets.map((s,i)=>`第${i+1}組 ${s.weight}kg×${s.reps}`).join('、')).join('\n');
   const date=toISO(record.timestamp);
   try {
-    const res=await fetch(WORKER_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:`${p.name} · ${date}`,date,part:p.name,exerciseCount:(record.exercises||[]).length,totalSets,durationMin:Math.round(record.duration/60),detail,volume:vol})});
+    const ctrl = new AbortController();
+    const tid = setTimeout(()=>ctrl.abort(), 10000);
+    const res=await fetch(WORKER_URL,{method:'POST',signal:ctrl.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({title:`${p.name} · ${date}`,date,part:p.name,exerciseCount:(record.exercises||[]).length,totalSets,durationMin:Math.round(record.duration/60),detail,volume:vol})});
+    clearTimeout(tid);
     return res.ok;
   } catch(e){ return false; }
 }
