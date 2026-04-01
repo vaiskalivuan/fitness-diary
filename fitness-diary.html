@@ -158,7 +158,8 @@ svg.line-chart { width: 100%; display: block; }
 .sets-tbl td:first-child { text-align: left; font-size: 12px; color: var(--muted); width: 24px; }
 .nc { display: flex; align-items: center; justify-content: center; gap: 6px; }
 .ncb { width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
-.ncv { font-size: 14px; font-weight: 700; min-width: 28px; text-align: center; }
+.ncv { font-size: 14px; font-weight: 700; min-width: 36px; text-align: center; }
+.ncv.tappable { cursor: pointer; border-bottom: 1.5px dashed var(--border); padding-bottom: 1px; }
 .rest-btn { background: none; border: none; color: var(--primary); font-size: 17px; cursor: pointer; }
 .el-foot { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
 .el-link { background: none; border: none; font-size: 12px; color: var(--primary); cursor: pointer; font-weight: 500; padding: 4px 0; }
@@ -366,6 +367,7 @@ svg.line-chart { width: 100%; display: block; }
   <div class="nav"><div class="nav-inner">
     <button class="nav-back" onclick="closeSub()">‹</button>
     <div class="nav-title">訓練詳情</div>
+    <button class="nav-action" onclick="editWorkout()">編輯</button>
     <button class="nav-action" style="color:#e85d75" onclick="deleteWorkout()">刪除</button>
   </div></div>
   <div class="page-inner det-bottom" id="detail-content"></div>
@@ -800,7 +802,11 @@ function confirmExercises() {
 // ── WORKOUT ──
 function renderWorkout() {
   const p = getPart(workoutData.partId);
-  document.getElementById('w-title').textContent = p.name;
+  document.getElementById('w-title').textContent = workoutData.editingId ? p.name+' (編輯)' : p.name;
+  document.getElementById('btn-finish').textContent = workoutData.editingId ? '✓ 儲存修改' : '✓ 完成訓練';
+  if(workoutData.editingId) {
+    document.getElementById('w-time').textContent = fmtDur(workoutData.originalDuration);
+  }
   renderExerciseLogs();
 }
 
@@ -813,20 +819,20 @@ function renderExerciseLogs() {
     const rows = ex.sets.map((s,si)=>`<tr>
       <td>${si+1}</td>
       <td><div class="nc">
-        <button class="ncb" onclick="chgVal(${ei},${si},'weight',-2.5)">−</button>
-        <div class="ncv">${s.weight}</div>
-        <button class="ncb" onclick="chgVal(${ei},${si},'weight',2.5)">＋</button>
+        <button class="ncb" onclick="chgVal(${ei},${si},'weight',-1)">−</button>
+        <div class="ncv tappable" id="ncv-${ei}-${si}-weight" onclick="promptVal(${ei},${si},'weight')">${s.weight}</div>
+        <button class="ncb" onclick="chgVal(${ei},${si},'weight',1)">＋</button>
       </div></td>
       <td><div class="nc">
         <button class="ncb" onclick="chgVal(${ei},${si},'reps',-1)">−</button>
-        <div class="ncv">${s.reps}</div>
+        <div class="ncv tappable" id="ncv-${ei}-${si}-reps" onclick="promptVal(${ei},${si},'reps')">${s.reps}</div>
         <button class="ncb" onclick="chgVal(${ei},${si},'reps',1)">＋</button>
       </div></td>
       <td><button class="rest-btn" onclick="startRestTimer()">⏱</button></td>
     </tr>`).join('');
     return `<div class="ex-log">
       <div class="el-head">
-        <div class="el-name">${ex.name} <span class="vol-tag">${exVol}kg</span></div>
+        <div class="el-name">${ex.name} <span class="vol-tag" id="voltag-${ei}">${exVol}kg</span></div>
         <button class="el-del" onclick="removeEx(${ei})">刪除</button>
       </div>
       <table class="sets-tbl">
@@ -847,7 +853,34 @@ function renderExerciseLogs() {
 function chgVal(ei,si,key,delta) {
   const v = workoutData.exercises[ei].sets[si][key] + delta;
   workoutData.exercises[ei].sets[si][key] = Math.max(0, Math.round(v*10)/10);
-  renderExerciseLogs();
+  updateValDOM(ei,si,key);
+}
+
+function promptVal(ei,si,key) {
+  const cur = workoutData.exercises[ei].sets[si][key];
+  const label = key==='weight' ? '輸入重量 (kg)' : '輸入次數';
+  const val = prompt(label, cur);
+  if(val===null) return;
+  const num = parseFloat(val);
+  if(!isNaN(num) && num>=0) {
+    workoutData.exercises[ei].sets[si][key] = Math.round(num*10)/10;
+    updateValDOM(ei,si,key);
+  }
+}
+
+function updateValDOM(ei,si,key) {
+  const ex = workoutData.exercises[ei];
+  const s = ex.sets[si];
+  const el = document.getElementById(`ncv-${ei}-${si}-${key}`);
+  if(el) el.textContent = s[key];
+  // Update the other key too (both affect volume)
+  const otherKey = key==='weight'?'reps':'weight';
+  const exVol = ex.sets.reduce((a,s)=>a+(s.weight||0)*(s.reps||0),0);
+  const voltag = document.getElementById(`voltag-${ei}`);
+  if(voltag) voltag.textContent = exVol+'kg';
+  let totalVol=0;
+  workoutData.exercises.forEach(e=>{ totalVol+=e.sets.reduce((a,s)=>a+(s.weight||0)*(s.reps||0),0); });
+  document.getElementById('w-vol').textContent = totalVol+'kg';
 }
 
 function addSet(ei) {
@@ -896,21 +929,28 @@ function stopTimer() { clearInterval(restInterval); document.getElementById('tim
 function cancelWorkout() {
   if(!confirm('確定要取消這次訓練？')) return;
   clearInterval(workoutTimer); clearInterval(restInterval);
-  workoutData={partId:null,exercises:[],startTime:null};
+  workoutData={partId:null,exercises:[],startTime:null,editingId:null};
   closeSub();
 }
 
 async function finishWorkout() {
   clearInterval(workoutTimer);
-  const duration = Math.floor((Date.now()-workoutData.startTime)/1000);
-  const record = {id:Date.now().toString(), timestamp:Date.now(), partId:workoutData.partId, duration, exercises:workoutData.exercises};
-  const h=getHistory(); h.push(record); saveHistory(h);
+  const isEditing = !!workoutData.editingId;
+  const duration = isEditing ? workoutData.originalDuration : Math.floor((Date.now()-workoutData.startTime)/1000);
+  const record = {
+    id: isEditing ? workoutData.editingId : Date.now().toString(),
+    timestamp: isEditing ? workoutData.originalTimestamp : Date.now(),
+    partId: workoutData.partId, duration, exercises: workoutData.exercises
+  };
+  let h = getHistory();
+  if(isEditing) { h = h.map(x=>x.id===record.id ? record : x); } else { h.push(record); }
+  saveHistory(h);
   const btn=document.getElementById('btn-finish');
   btn.textContent='同步中…'; btn.disabled=true;
   const ok = await syncToNotion(record);
   btn.textContent = ok?'✓ 已同步 Notion':'✓ 完成';
   setTimeout(()=>{
-    workoutData={partId:null,exercises:[],startTime:null};
+    workoutData={partId:null,exercises:[],startTime:null,editingId:null};
     closeSub();
   },800);
 }
@@ -950,6 +990,20 @@ function showDetail(id) {
   });
   document.getElementById('detail-content').innerHTML=html;
   openSub('page-detail');
+}
+
+function editWorkout() {
+  const w = getHistory().find(x=>x.id===currentDetailId); if(!w) return;
+  workoutData = {
+    partId: w.partId,
+    exercises: JSON.parse(JSON.stringify(w.exercises)),
+    startTime: w.timestamp,
+    editingId: w.id,
+    originalTimestamp: w.timestamp,
+    originalDuration: w.duration
+  };
+  openSub('page-workout');
+  renderWorkout();
 }
 
 function deleteWorkout() {
