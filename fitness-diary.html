@@ -150,14 +150,14 @@ svg.line-chart { width: 100%; display: block; }
 .ex-log { background: var(--card); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow); }
 .el-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .el-name { font-size: 15px; font-weight: 700; }
-.el-del { background: none; border: none; color: #ccc; font-size: 18px; cursor: pointer; }
+.el-del { background: none; border: 1px solid #ffb3b3; border-radius: 6px; color: #e85d75; font-size: 12px; font-weight: 600; padding: 4px 10px; cursor: pointer; }
 .sets-tbl { width: 100%; border-collapse: collapse; }
 .sets-tbl th { font-size: 10px; color: var(--muted); text-align: center; padding: 0 4px 7px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
 .sets-tbl th:first-child { text-align: left; }
 .sets-tbl td { padding: 7px 4px; text-align: center; border-top: 1px solid var(--border); }
 .sets-tbl td:first-child { text-align: left; font-size: 12px; color: var(--muted); width: 24px; }
 .nc { display: flex; align-items: center; justify-content: center; gap: 6px; }
-.ncb { width: 26px; height: 26px; border-radius: 7px; border: 1.5px solid var(--border); background: var(--bg); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
+.ncb { width: 40px; height: 40px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
 .ncv { font-size: 14px; font-weight: 700; min-width: 28px; text-align: center; }
 .rest-btn { background: none; border: none; color: var(--primary); font-size: 17px; cursor: pointer; }
 .el-foot { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
@@ -336,7 +336,7 @@ svg.line-chart { width: 100%; display: block; }
   <div class="nav"><div class="nav-inner">
     <button class="nav-back" onclick="goBackFromExercise()">‹</button>
     <div class="nav-title" id="ex-page-title">選擇動作</div>
-    <button class="nav-action" onclick="confirmExercises()">開始</button>
+    <button class="nav-action" id="ex-confirm-btn" onclick="confirmExercises()">開始</button>
   </div></div>
   <div class="page-inner" id="ex-list"></div>
 </div>
@@ -740,8 +740,10 @@ function confirmPart() {
 
 // ── EXERCISE SELECT ──
 function renderExercise() {
-  const p = getPart(selectedPart);
-  document.getElementById('ex-page-title').textContent = `選擇動作：${p.name}`;
+  const inWorkout = !!workoutData.startTime;
+  const p = getPart(selectedPart || workoutData.partId);
+  document.getElementById('ex-page-title').textContent = inWorkout ? '新增動作' : `選擇動作：${p.name}`;
+  document.getElementById('ex-confirm-btn').textContent = inWorkout ? '確認' : '開始';
   const exData = EXERCISES[selectedPart] || {traditional:[],machine:[]};
   const customs = getCustom()[selectedPart] || [];
   let html = renderChipCat('傳統動作', exData.traditional);
@@ -771,6 +773,7 @@ function toggleEx(name) {
 }
 
 function goBackFromExercise() {
+  if(workoutData.startTime) { openSub('page-workout'); return; }
   openSub('page-body-part');
 }
 
@@ -824,7 +827,7 @@ function renderExerciseLogs() {
     return `<div class="ex-log">
       <div class="el-head">
         <div class="el-name">${ex.name} <span class="vol-tag">${exVol}kg</span></div>
-        <button class="el-del" onclick="removeEx(${ei})">🗑</button>
+        <button class="el-del" onclick="removeEx(${ei})">刪除</button>
       </div>
       <table class="sets-tbl">
         <thead><tr><th>組</th><th>重量(kg)</th><th>次數</th><th>計時</th></tr></thead>
