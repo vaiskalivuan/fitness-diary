@@ -323,7 +323,7 @@ svg.line-chart { width: 100%; display: block; }
 <!-- ══ SUB: 選擇部位 ══ -->
 <div class="sub-page" id="page-body-part">
   <div class="nav"><div class="nav-inner">
-    <button class="nav-back" onclick="closeSub()">‹</button>
+    <button class="nav-back" onclick="backFromBodyPart()">‹</button>
     <div class="nav-title">選擇部位</div>
   </div></div>
   <div class="page-inner">
@@ -732,8 +732,20 @@ function selectPart(id) {
   document.getElementById('btn-confirm-part').disabled = false;
 }
 
+function backFromBodyPart() {
+  if(workoutData.startTime) { openSub('page-workout'); return; }
+  closeSub();
+}
+
 function confirmPart() {
   if(!selectedPart) return;
+  if(workoutData.startTime) {
+    // 訓練中：只用 selectedPart 瀏覽動作，不改 workoutData.partId
+    selectedExercises = [];
+    openSub('page-exercise');
+    renderExercise();
+    return;
+  }
   workoutData.partId = selectedPart;
   selectedExercises = [];
   openSub('page-exercise');
@@ -905,9 +917,10 @@ function removeEx(ei) {
 }
 
 function goBackFromWorkout() {
-  selectedExercises = workoutData.exercises.map(e=>e.name);
-  openSub('page-exercise');
-  renderExercise();
+  selectedPart = null;
+  selectedExercises = [];
+  openSub('page-body-part');
+  renderBodyPart();
 }
 
 function startWorkoutTimer() {
