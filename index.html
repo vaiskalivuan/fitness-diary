@@ -962,8 +962,14 @@ async function finishWorkout() {
   saveHistory(h);
   const btn=document.getElementById('btn-finish');
   btn.textContent='同步中…'; btn.disabled=true;
-  const ok = await syncToNotion(record);
-  btn.textContent = ok?'✓ 已同步 Notion':'✓ 完成';
+  const pageId = await syncToNotion(record);
+  if(pageId) {
+    // 把 Notion page ID 存回 localStorage
+    const h2=getHistory();
+    const idx=h2.findIndex(x=>x.id===record.id);
+    if(idx>=0){ h2[idx].notionPageId=pageId; saveHistory(h2); }
+  }
+  btn.textContent = pageId?'✓ 已同步 Notion':'✓ 完成';
   setTimeout(()=>{
     workoutData={partId:null,exercises:[],startTime:null,editingId:null};
     closeSub();
@@ -981,8 +987,10 @@ async function syncToNotion(record) {
     const tid = setTimeout(()=>ctrl.abort(), 10000);
     const res=await fetch(WORKER_URL,{method:'POST',signal:ctrl.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({title:`${p.name} · ${date}`,date,part:p.name,exerciseCount:(record.exercises||[]).length,totalSets,durationMin:Math.round(record.duration/60),detail,volume:vol})});
     clearTimeout(tid);
-    return res.ok;
-  } catch(e){ return false; }
+    if(!res.ok) return null;
+    const json = await res.json();
+    return json.pageId || null;
+  } catch(e){ return null; }
 }
 
 // ── DETAIL ──
@@ -1024,10 +1032,24 @@ function editWorkout() {
   renderWorkout();
 }
 
-function deleteWorkout() {
+async function deleteWorkout() {
   if(!confirm('確定刪除這筆紀錄？')) return;
-  saveHistory(getHistory().filter(w=>w.id!==currentDetailId));
+  const h = getHistory();
+  const w = h.find(x=>x.id===currentDetailId);
+  saveHistory(h.filter(x=>x.id!==currentDetailId));
   closeSub();
+  // 連動刪除 Notion（背景執行，不擋 UI）
+  if(w?.notionPageId) {
+    try {
+      const ctrl = new AbortController();
+      setTimeout(()=>ctrl.abort(), 10000);
+      await fetch(WORKER_URL, {
+        method:'DELETE', signal:ctrl.signal,
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({pageId: w.notionPageId})
+      });
+    } catch(e){}
+  }
 }
 
 // ── HYROX ──
