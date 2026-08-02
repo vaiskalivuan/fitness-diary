@@ -1116,21 +1116,26 @@ async function syncToNotion(record) {
   }).join('\n');
   const date = new Date(record.timestamp).toISOString().slice(0, 10);
   try {
+    const payload = {
+      title: `${partNames.join('・') || '全身'} · ${date}`,
+      date,
+      part: partNames.join('、') || '全身',
+      exerciseCount: exercises.length,
+      totalSets,
+      durationMin: Math.round(record.duration / 60),
+      detail,
+      volume: volume || undefined
+    };
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: `${partNames.join('・') || '全身'} · ${date}`,
-        date,
-        part: partNames.join('、') || '全身',
-        exerciseCount: exercises.length,
-        totalSets,
-        durationMin: Math.round(record.duration / 60),
-        detail,
-        volume: volume || undefined
-      })
+      body: JSON.stringify(payload)
     });
-    if (!res.ok) return false;
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      console.error('syncToNotion failed', res.status, errText, payload);
+      return false;
+    }
     const json = await res.json();
     if (json.pageId) {
       const history = getHistory();
