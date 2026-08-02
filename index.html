@@ -1148,15 +1148,17 @@ async function syncAllToNotion() {
   if (unsynced.length === 0) { alert('所有紀錄都已同步'); return; }
   const btn = document.getElementById('btn-sync-all');
   if (btn) { btn.textContent = `同步中 0/${unsynced.length}…`; btn.disabled = true; }
-  let done = 0;
+  let done = 0, failed = 0;
   for (const record of unsynced) {
-    await syncToNotion(record);
-    done++;
-    if (btn) btn.textContent = `同步中 ${done}/${unsynced.length}…`;
+    const ok = await syncToNotion(record);
+    if (ok) done++; else failed++;
+    if (btn) btn.textContent = `同步中 ${done + failed}/${unsynced.length}…`;
     await new Promise(r => setTimeout(r, 400));
   }
-  if (btn) { btn.textContent = `✓ 已補同步 ${done} 筆`; btn.disabled = false; }
-  setTimeout(() => renderSettings(), 2000);
+  const msg = failed > 0 ? `✓ 成功 ${done} 筆，失敗 ${failed} 筆` : `✓ 已補同步 ${done} 筆`;
+  if (btn) { btn.textContent = msg; btn.disabled = false; }
+  if (failed > 0) alert(`同步失敗 ${failed} 筆，請確認 Notion 連線正常後再試一次`);
+  setTimeout(() => renderSettings(), 3000);
 }
 
 async function finishWorkout() {
