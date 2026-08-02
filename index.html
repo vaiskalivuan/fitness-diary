@@ -324,7 +324,8 @@
 <!-- ── Workout Logger ── -->
 <div class="page" id="page-workout">
   <div class="nav"><div class="nav-inner">
-    <div class="nav-title">訓練中</div>
+    <button class="nav-back" id="workout-back-btn" style="display:none" onclick="cancelEdit()">‹</button>
+    <div class="nav-title" id="workout-nav-title">訓練中</div>
   </div></div>
   <div style="padding:16px;">
     <div class="workout-header">
@@ -367,7 +368,8 @@
   <div class="nav"><div class="nav-inner">
     <button class="nav-back" onclick="detailBack()">‹</button>
     <div class="nav-title">訓練詳情</div>
-    <button class="nav-action" style="color:#ff6b6b" onclick="deleteWorkout()">刪除</button>
+    <button class="nav-action" onclick="editWorkout()">編輯</button>
+    <button class="nav-action" style="color:#ff6b6b;margin-left:8px" onclick="deleteWorkout()">刪除</button>
   </div></div>
   <div style="padding:16px;" id="detail-content"></div>
 </div>
@@ -490,6 +492,8 @@ let workoutData = { exercises: [], startTime: null };
 let workoutTimer = null;
 let restTimerInterval = null;
 let currentDetailId = null;
+let editMode = false;
+let editWorkoutId = null;
 
 // ── Storage ──
 function getHistory() { return JSON.parse(localStorage.getItem('fitness_history') || '[]'); }
@@ -530,6 +534,38 @@ function switchTab(pageId) { goTo(pageId); }
 
 function searchBack() { goTo(prevTabPage); }
 function detailBack() { goTo(prevTabPage); }
+
+function editWorkout() {
+  const h = getHistory().find(x => x.id === currentDetailId);
+  if (!h) return;
+  clearInterval(workoutTimer);
+  editMode = true;
+  editWorkoutId = currentDetailId;
+  workoutData = {
+    exercises: JSON.parse(JSON.stringify(h.exercises || [])),
+    startTime: Date.now() - (h.duration || 0) * 1000
+  };
+  document.getElementById('workout-nav-title').textContent = '編輯訓練';
+  document.getElementById('workout-back-btn').style.display = '';
+  workoutTimer = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - workoutData.startTime) / 1000);
+    const m = Math.floor(elapsed / 60), s = elapsed % 60;
+    const el = document.getElementById('workout-time');
+    if (el) el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }, 1000);
+  renderExerciseLogs();
+  goTo('page-workout');
+}
+
+function cancelEdit() {
+  clearInterval(workoutTimer);
+  workoutData = { exercises: [], startTime: null };
+  editMode = false;
+  editWorkoutId = null;
+  document.getElementById('workout-nav-title').textContent = '訓練中';
+  document.getElementById('workout-back-btn').style.display = 'none';
+  goTo('page-detail');
+}
 
 // ── Home ──
 function renderHome() {
@@ -755,28 +791,33 @@ function showDetail(id) {
   const partIds = [...new Set(exercises.map(ex => ex.partId || h.partId).filter(Boolean))];
   const partNames = partIds.map(id => { const p = BODY_PARTS.find(b => b.id === id); return p ? p.name : ''; }).filter(Boolean);
 
+  const totalVol = exercises.reduce((a,e) => a + (e.sets||[]).reduce((b,s) => b + (s.weight||0)*(s.reps||0), 0), 0);
+
   let html = `<div class="detail-header">
     <div class="detail-date">${date}</div>
     <div class="detail-title">🔥 ${partNames.join('・') || '全身訓練'}</div>
     <div class="detail-meta">
       <div class="detail-stat"><strong>${formatDuration(h.duration)}</strong>時長</div>
-      <div class="detail-stat"><strong>${exercises.length}</strong>動作</div>
-      <div class="detail-stat"><strong>${totalSets}</strong>組</div>
+      <div class="detail-stat"><strong>${totalSets}</strong>組數</div>
+      ${totalVol > 0 ? `<div class="detail-stat"><strong>${totalVol.toLocaleString()}</strong>容量kg</div>` : ''}
     </div>
   </div>`;
 
   exercises.forEach(ex => {
     const part = BODY_PARTS.find(b => b.id === (ex.partId || h.partId));
+    const exVol = (ex.sets||[]).reduce((a,s) => a + (s.weight||0)*(s.reps||0), 0);
     html += `<div class="detail-exercise">
       <div class="detail-exercise-header">
         <div class="detail-exercise-name">${ex.name}</div>
+        ${exVol > 0 ? `<span style="color:var(--teal);font-size:13px;font-weight:600">${exVol.toLocaleString()}kg</span>` : ''}
         ${part ? `<span class="exercise-part-tag">${part.name}</span>` : ''}
       </div>`;
     (ex.sets||[]).forEach((s,i) => {
+      const setVol = s.isBodyweight ? '' : (s.weight && s.reps ? `<span style="color:var(--muted);font-size:12px">${(s.weight*s.reps).toLocaleString()}kg</span>` : '');
       if (s.isBodyweight) {
-        html += `<div class="set-row"><span class="set-num">第 ${i+1} 組</span><span>自體重 × ${s.reps} 下</span></div>`;
+        html += `<div class="set-row"><span class="set-num">第${i+1}組</span><span>自體重 × ${s.reps} 下</span>${setVol}</div>`;
       } else {
-        html += `<div class="set-row"><span class="set-num">第 ${i+1} 組</span><span>${s.weight}kg × ${s.reps} 下</span></div>`;
+        html += `<div class="set-row"><span class="set-num">第${i+1}組</span><span>${s.weight}kg × ${s.reps} 下</span>${setVol}</div>`;
       }
     });
     if (ex.note) html += `<div class="detail-note">📝 ${ex.note}</div>`;
@@ -1093,6 +1134,26 @@ async function finishWorkout() {
   });
   clearInterval(workoutTimer);
   const duration = Math.floor((Date.now() - workoutData.startTime) / 1000);
+  const btn = document.getElementById('btn-finish');
+
+  if (editMode) {
+    const history = getHistory();
+    const idx = history.findIndex(h => h.id === editWorkoutId);
+    if (idx !== -1) {
+      history[idx].exercises = workoutData.exercises;
+      history[idx].duration = duration;
+      saveHistory(history);
+    }
+    workoutData = { exercises: [], startTime: null };
+    editMode = false;
+    editWorkoutId = null;
+    document.getElementById('workout-nav-title').textContent = '訓練中';
+    document.getElementById('workout-back-btn').style.display = 'none';
+    addingExercise = false;
+    showDetail(history[idx].id);
+    return;
+  }
+
   const record = {
     id: Date.now().toString(),
     timestamp: Date.now(),
@@ -1103,7 +1164,6 @@ async function finishWorkout() {
   history.push(record);
   saveHistory(history);
 
-  const btn = document.getElementById('btn-finish');
   let ok = false;
   if (getNotionSync()) {
     if (btn) { btn.textContent = '同步中…'; btn.disabled = true; }
