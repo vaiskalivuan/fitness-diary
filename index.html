@@ -172,6 +172,9 @@
   .settings-item:last-child { border-bottom: none; }
   .settings-item.danger { color: #ff6b6b; }
   .settings-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 14px 16px 8px; font-weight: 600; }
+  .toggle-on { background: var(--primary) !important; }
+  .toggle-on::after { transform: translateX(18px) !important; }
+  #notion-slider::after { content:''; position:absolute; height:20px; width:20px; left:3px; bottom:3px; background:white; border-radius:50%; transition:.3s; }
 
   /* Modal */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 400; align-items: flex-end; justify-content: center; }
@@ -267,6 +270,16 @@
     </div>
   </div>
   <div style="padding:16px;">
+    <div class="settings-label">同步</div>
+    <div class="settings-section">
+      <div class="settings-item" style="cursor:default;">
+        <span>Notion 同步</span>
+        <label style="position:relative;display:inline-block;width:44px;height:26px;">
+          <input type="checkbox" id="notion-toggle" style="opacity:0;width:0;height:0;" onchange="saveNotionToggle(this.checked)">
+          <span id="notion-slider" style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:26px;transition:.3s;"></span>
+        </label>
+      </div>
+    </div>
     <div class="settings-label">資料管理</div>
     <div class="settings-section">
       <div class="settings-item" onclick="exportData()">
@@ -652,6 +665,11 @@ function renderAchievements() {
 
 // ── Settings ──
 function renderSettings() {
+  const notionOn = getNotionSync();
+  const toggle = document.getElementById('notion-toggle');
+  const slider = document.getElementById('notion-slider');
+  if (toggle) toggle.checked = notionOn;
+  if (slider) { notionOn ? slider.classList.add('toggle-on') : slider.classList.remove('toggle-on'); }
   const customs = getCustomExercises();
   const parts = Object.entries(customs).filter(([,v]) => v.length > 0);
   const el = document.getElementById('custom-ex-list');
@@ -667,6 +685,13 @@ function renderSettings() {
         </div>`).join('');
     }).join('');
   }
+}
+
+function getNotionSync() { return localStorage.getItem('notion_sync') !== 'false'; }
+function saveNotionToggle(val) {
+  localStorage.setItem('notion_sync', val ? 'true' : 'false');
+  const slider = document.getElementById('notion-slider');
+  if (slider) { val ? slider.classList.add('toggle-on') : slider.classList.remove('toggle-on'); }
 }
 
 function removeCustomEx(partId, name) {
@@ -1079,9 +1104,12 @@ async function finishWorkout() {
   saveHistory(history);
 
   const btn = document.getElementById('btn-finish');
-  if (btn) { btn.textContent = '同步中…'; btn.disabled = true; }
-  const ok = await syncToNotion(record);
-  if (btn) { btn.textContent = ok ? '✓ 已同步 Notion' : '✓ 完成（未同步）'; }
+  let ok = false;
+  if (getNotionSync()) {
+    if (btn) { btn.textContent = '同步中…'; btn.disabled = true; }
+    ok = await syncToNotion(record);
+  }
+  if (btn) { btn.textContent = ok ? '✓ 已同步 Notion' : '✓ 完成'; }
 
   setTimeout(() => {
     workoutData = { exercises: [], startTime: null };
