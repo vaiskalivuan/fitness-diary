@@ -1153,6 +1153,7 @@ async function syncAllToNotion() {
     await syncToNotion(record);
     done++;
     if (btn) btn.textContent = `同步中 ${done}/${unsynced.length}…`;
+    await new Promise(r => setTimeout(r, 400));
   }
   if (btn) { btn.textContent = `✓ 已補同步 ${done} 筆`; btn.disabled = false; }
   setTimeout(() => renderSettings(), 2000);
