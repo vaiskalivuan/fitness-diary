@@ -270,8 +270,12 @@
     <div class="settings-label">資料管理</div>
     <div class="settings-section">
       <div class="settings-item" onclick="exportData()">
-        <span>匯出訓練資料</span><span>›</span>
+        <span>匯出訓練資料（JSON）</span><span>›</span>
       </div>
+      <label class="settings-item" style="cursor:pointer;">
+        <span>匯入訓練資料（JSON）</span><span>›</span>
+        <input type="file" accept=".json" style="display:none" onchange="importData(event)">
+      </label>
       <div class="settings-item danger" onclick="clearAllData()">
         <span>清除所有資料</span><span>›</span>
       </div>
@@ -681,6 +685,31 @@ function exportData() {
   a.download = `fitness-backup-${new Date().toISOString().slice(0,10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      // 支援兩種格式：{ history, custom } 或純陣列
+      const incoming = Array.isArray(data) ? data : (data.history || []);
+      const existing = getHistory();
+      const existingIds = new Set(existing.map(h => h.id));
+      const merged = [...existing, ...incoming.filter(h => !existingIds.has(h.id))];
+      merged.sort((a, b) => a.timestamp - b.timestamp);
+      saveHistory(merged);
+      if (!Array.isArray(data) && data.custom) saveCustomExercises(data.custom);
+      alert(`匯入完成！新增 ${merged.length - existing.length} 筆訓練。`);
+      renderSettings();
+    } catch {
+      alert('檔案格式錯誤，請確認是正確的 JSON 備份檔。');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 function clearAllData() {
