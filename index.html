@@ -1124,7 +1124,6 @@ async function syncToNotion(record) {
       totalSets,
       durationMin: Math.round(record.duration / 60),
       detail,
-      volume: volume || undefined
     };
     const res = await fetch(WORKER_URL, {
       method: 'POST',
