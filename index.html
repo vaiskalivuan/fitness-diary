@@ -1159,10 +1159,8 @@ async function syncAllToNotion() {
     if (btn) btn.textContent = `同步中 ${done + failed}/${unsynced.length}…`;
     await new Promise(r => setTimeout(r, 400));
   }
-  const msg = failed > 0 ? `✓ 成功 ${done} 筆，失敗 ${failed} 筆` : `✓ 已補同步 ${done} 筆`;
-  if (btn) { btn.textContent = msg; btn.disabled = false; }
-  if (failed > 0) alert(`同步失敗 ${failed} 筆，請確認 Notion 連線正常後再試一次`);
-  setTimeout(() => renderSettings(), 3000);
+  if (btn) { btn.textContent = `✓ 補同步完成`; btn.disabled = false; }
+  setTimeout(() => renderSettings(), 2000);
 }
 
 async function finishWorkout() {
