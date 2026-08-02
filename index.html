@@ -289,6 +289,9 @@
         <span>匯入訓練資料（JSON）</span><span>›</span>
         <input type="file" accept=".json" style="display:none" onchange="importData(event)">
       </label>
+      <div class="settings-item" onclick="syncAllToNotion()" id="btn-sync-all">
+        <span>補同步到 Notion（未同步筆數）</span><span>›</span>
+      </div>
       <div class="settings-item danger" onclick="clearAllData()">
         <span>清除所有資料</span><span>›</span>
       </div>
@@ -706,6 +709,9 @@ function renderSettings() {
   const slider = document.getElementById('notion-slider');
   if (toggle) toggle.checked = notionOn;
   if (slider) { notionOn ? slider.classList.add('toggle-on') : slider.classList.remove('toggle-on'); }
+  const unsyncedCount = getHistory().filter(h => !h.notionPageId).length;
+  const syncBtn = document.getElementById('btn-sync-all');
+  if (syncBtn) syncBtn.querySelector('span').textContent = `補同步到 Notion（${unsyncedCount} 筆未同步）`;
   const customs = getCustomExercises();
   const parts = Object.entries(customs).filter(([,v]) => v.length > 0);
   const el = document.getElementById('custom-ex-list');
@@ -1097,10 +1103,11 @@ const WORKER_URL = 'https://tiny-sea-381f.aniki715.workers.dev/';
 async function syncToNotion(record) {
   const exercises = record.exercises || [];
   const totalSets = exercises.reduce((a, e) => a + (e.sets||[]).length, 0);
-  const partIds = [...new Set(exercises.map(ex => ex.partId).filter(Boolean))];
+  const partIds = [...new Set(exercises.map(ex => ex.partId || record.partId).filter(Boolean))];
   const partNames = partIds.map(id => { const p = BODY_PARTS.find(b => b.id === id); return p ? p.name : id; });
+  const volume = exercises.reduce((a,e) => a + (e.sets||[]).reduce((b,s) => b + (s.weight||0)*(s.reps||0), 0), 0);
   const detail = exercises.map(ex => {
-    const part = BODY_PARTS.find(b => b.id === ex.partId);
+    const part = BODY_PARTS.find(b => b.id === (ex.partId || record.partId));
     const setsStr = (ex.sets||[]).map((s,i) =>
       s.isBodyweight ? `第${i+1}組 自體重×${s.reps}` : `第${i+1}組 ${s.weight}kg×${s.reps}`
     ).join('、');
@@ -1119,11 +1126,36 @@ async function syncToNotion(record) {
         exerciseCount: exercises.length,
         totalSets,
         durationMin: Math.round(record.duration / 60),
-        detail
+        detail,
+        volume: volume || undefined
       })
     });
-    return res.ok;
+    if (!res.ok) return false;
+    const json = await res.json();
+    if (json.pageId) {
+      const history = getHistory();
+      const idx = history.findIndex(h => h.id === record.id);
+      if (idx !== -1) { history[idx].notionPageId = json.pageId; saveHistory(history); }
+    }
+    return true;
   } catch(e) { return false; }
+}
+
+async function syncAllToNotion() {
+  if (!getNotionSync()) { alert('請先開啟 Notion 同步'); return; }
+  const history = getHistory();
+  const unsynced = history.filter(h => !h.notionPageId);
+  if (unsynced.length === 0) { alert('所有紀錄都已同步'); return; }
+  const btn = document.getElementById('btn-sync-all');
+  if (btn) { btn.textContent = `同步中 0/${unsynced.length}…`; btn.disabled = true; }
+  let done = 0;
+  for (const record of unsynced) {
+    await syncToNotion(record);
+    done++;
+    if (btn) btn.textContent = `同步中 ${done}/${unsynced.length}…`;
+  }
+  if (btn) { btn.textContent = `✓ 已補同步 ${done} 筆`; btn.disabled = false; }
+  setTimeout(() => renderSettings(), 2000);
 }
 
 async function finishWorkout() {
