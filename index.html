@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>健身日記</title>
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="健身日記">
+<meta name="theme-color" content="#e85d75">
+<style>
+  :root {
+    --primary: #e85d75;
+    --primary-light: #fce8ec;
+    --teal: #4ecdc4;
+    --bg: #f9f6f3;
+    --card: #ffffff;
+    --text: #2d2d2d;
+    --muted: #999;
+    --border: #efe8e0;
+    --radius: 16px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, 'PingFang TC', 'Noto Sans TC', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .nav { background: var(--card); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+  .nav-inner { max-width: 480px; margin: auto; display: flex; align-items: center; padding: 14px 16px; gap: 12px; }
+  .nav-back { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--primary); padding: 4px; }
+  .nav-title { font-size: 17px; font-weight: 600; flex: 1; }
+  .nav-action { background: none; border: none; font-size: 14px; color: var(--primary); cursor: pointer; font-weight: 500; }
+
+  .page { display: none; max-width: 480px; margin: auto; }
+  .page.active { display: block; }
+
+  /* Tab Bar */
+  .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 8px 0 calc(8px + env(safe-area-inset-bottom)); z-index: 200; }
+  .tab-bar.hidden { display: none; }
+  .tab-item { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 8px; cursor: pointer; flex: 1; }
+  .tab-icon { font-size: 22px; }
+  .tab-label { font-size: 10px; color: var(--muted); }
+  .tab-item.active .tab-label { color: var(--primary); font-weight: 600; }
+  .tab-spacer { height: 75px; }
+
+  /* Home */
+  .home-header { text-align: center; padding: 28px 0 20px; }
+  .home-header h1 { font-size: 26px; font-weight: 700; }
+  .home-header p { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .home-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: var(--card); border-radius: var(--radius); padding: 14px 10px; text-align: center; box-shadow: var(--shadow); }
+  .stat-card .num { font-size: 24px; font-weight: 700; color: var(--primary); }
+  .stat-card .label { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* Achievement badges row */
+  .badges-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 20px; -webkit-overflow-scrolling: touch; }
+  .badges-row::-webkit-scrollbar { display: none; }
+  .badge { background: var(--card); border-radius: 12px; padding: 8px 12px; display: flex; align-items: center; gap: 6px; box-shadow: var(--shadow); white-space: nowrap; flex-shrink: 0; border: 2px solid transparent; }
+  .badge.unlocked { border-color: var(--primary); background: var(--primary-light); }
+  .badge.locked { opacity: 0.4; }
+  .badge .badge-icon { font-size: 18px; }
+  .badge .badge-name { font-size: 12px; font-weight: 600; }
+
+  /* Achievement Grid */
+  .achievement-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .achievement-card { background: var(--card); border-radius: var(--radius); padding: 20px 14px; display: flex; flex-direction: column; align-items: center; gap: 6px; box-shadow: var(--shadow); text-align: center; border: 2px solid transparent; }
+  .achievement-card.unlocked { border-color: var(--primary); }
+  .achievement-card.locked { opacity: 0.45; }
+  .achievement-card .ach-icon { font-size: 36px; }
+  .achievement-card .ach-name { font-size: 14px; font-weight: 700; }
+  .achievement-card .ach-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .achievement-card .ach-unlocked-tag { font-size: 10px; font-weight: 600; color: var(--primary); background: var(--primary-light); border-radius: 20px; padding: 2px 10px; margin-top: 4px; }
+
+  .btn-start { width: 100%; background: var(--primary); color: white; border: none; border-radius: var(--radius); padding: 16px; font-size: 17px; font-weight: 600; cursor: pointer; margin-bottom: 20px; box-shadow: 0 4px 16px rgba(232,93,117,0.35); }
+  .section-title { font-size: 12px; font-weight: 600; margin-bottom: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .history-list { display: flex; flex-direction: column; gap: 10px; }
+  .history-card { background: var(--card); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); cursor: pointer; display: flex; align-items: center; gap: 14px; }
+  .history-icon { width: 40px; height: 40px; background: var(--primary-light); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .history-icon.teal { background: #e0f7f5; }
+  .history-info { flex: 1; min-width: 0; }
+  .history-date { font-size: 13px; color: var(--muted); }
+  .history-name { font-size: 15px; font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+
+  /* Body Part */
+  .body-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+  .body-card { background: var(--card); border-radius: var(--radius); padding: 18px 14px; display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; box-shadow: var(--shadow); transition: transform 0.15s, box-shadow 0.15s; border: 2px solid transparent; }
+  .body-card:active { transform: scale(0.97); }
+  .body-card.selected { border-color: var(--primary); background: var(--primary-light); }
+  .body-card .icon { font-size: 32px; }
+  .body-card .name { font-size: 15px; font-weight: 600; }
+  .body-card .sub { font-size: 11px; color: var(--muted); text-align: center; }
+  .btn-primary { width: 100%; background: var(--primary); color: white; border: none; border-radius: var(--radius); padding: 15px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 20px; }
+  .btn-primary:disabled { opacity: 0.4; cursor: default; }
+
+  /* Exercise Select */
+  .exercise-category { margin-bottom: 20px; }
+  .cat-label { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .exercise-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { background: var(--card); border: 1.5px solid var(--border); border-radius: 20px; padding: 8px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 14px; box-shadow: var(--shadow); transition: all 0.15s; }
+  .chip.selected { background: var(--primary-light); border-color: var(--primary); color: var(--primary); font-weight: 600; }
+  .chip-add { font-size: 16px; font-weight: 700; }
+  .add-custom { border: 1.5px dashed var(--primary); border-radius: 20px; padding: 8px 14px; cursor: pointer; font-size: 14px; color: var(--primary); }
+
+  /* Workout Logger */
+  .workout-header { background: var(--card); border-radius: var(--radius); padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .workout-timer { font-size: 28px; font-weight: 700; color: var(--primary); }
+  .exercise-log { background: var(--card); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+  .exercise-log-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .exercise-log-name { font-size: 16px; font-weight: 600; flex: 1; }
+  .exercise-part-tag { font-size: 10px; background: var(--primary-light); color: var(--primary); border-radius: 10px; padding: 2px 8px; font-weight: 600; flex-shrink: 0; }
+  .btn-delete { background: none; border: none; font-size: 16px; cursor: pointer; padding: 4px; color: var(--muted); }
+  .num-input { display: flex; align-items: center; gap: 8px; justify-content: center; }
+  .num-btn { width: 30px; height: 30px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .num-val { font-size: 17px; font-weight: 700; min-width: 36px; text-align: center; }
+  .timer-btn { background: none; border: 1.5px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 16px; cursor: pointer; }
+  .sets-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .sets-link { background: none; border: none; font-size: 13px; color: var(--primary); cursor: pointer; padding: 4px 0; }
+  .sets-link.muted { color: var(--muted); }
+  .note-toggle { background: none; border: none; font-size: 13px; color: var(--muted); cursor: pointer; padding: 4px 0; margin-top: 6px; display: block; }
+  .note-area { width: 100%; margin-top: 6px; border: 1.5px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 14px; font-family: inherit; outline: none; resize: none; min-height: 60px; color: var(--text); }
+  .note-area:focus { border-color: var(--primary); }
+  .btn-add-exercise { width: 100%; background: var(--bg); border: 2px dashed var(--border); border-radius: var(--radius); padding: 14px; font-size: 15px; color: var(--primary); font-weight: 600; cursor: pointer; margin-top: 4px; }
+  .bottom-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card); border-top: 1px solid var(--border); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); display: flex; gap: 10px; max-width: 480px; margin: 0 auto; z-index: 100; }
+  .btn-cancel { flex: 1; background: var(--bg); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 14px; font-size: 15px; cursor: pointer; }
+  .btn-finish { flex: 2; background: var(--primary); color: white; border: none; border-radius: var(--radius); padding: 14px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .workout-spacer { height: 90px; }
+
+  /* Detail */
+  .detail-header { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .detail-date { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .detail-title { font-size: 20px; font-weight: 700; margin-bottom: 12px; }
+  .detail-meta { display: flex; gap: 16px; }
+  .detail-stat { font-size: 13px; color: var(--muted); display: flex; gap: 4px; align-items: baseline; }
+  .detail-stat strong { font-size: 18px; font-weight: 700; color: var(--text); }
+  .detail-exercise { background: var(--card); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; box-shadow: var(--shadow); }
+  .detail-exercise-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .detail-exercise-name { font-size: 16px; font-weight: 600; flex: 1; }
+  .set-row { display: flex; justify-content: space-between; padding: 6px 0; border-top: 1px solid var(--border); font-size: 14px; }
+  .set-num { color: var(--muted); }
+  .detail-note { font-size: 13px; color: var(--muted); margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+
+  /* Search */
+  .search-input-wrap { position: relative; margin-bottom: 16px; }
+  .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 16px; }
+  .search-input { width: 100%; background: var(--card); border: 1.5px solid var(--border); border-radius: 12px; padding: 12px 14px 12px 40px; font-size: 16px; font-family: inherit; outline: none; }
+  .search-input:focus { border-color: var(--primary); }
+  .search-result { background: var(--card); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; box-shadow: var(--shadow); cursor: pointer; }
+  .search-result-name { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .search-result-date { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .search-result-sets { font-size: 13px; color: var(--text); }
+  .search-result-note { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .search-empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 15px; line-height: 1.6; }
+
+  /* Stats */
+  .stats-section { margin-bottom: 20px; }
+  .stats-section-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stats-card { background: var(--card); border-radius: var(--radius); padding: 16px 14px; text-align: center; box-shadow: var(--shadow); }
+  .stats-card .s-num { font-size: 28px; font-weight: 700; color: var(--primary); }
+  .stats-card .s-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .part-bar-row { background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; box-shadow: var(--shadow); }
+  .part-bar-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+  .part-bar-track { background: var(--bg); border-radius: 4px; height: 6px; overflow: hidden; }
+  .part-bar-fill { background: var(--primary); height: 100%; border-radius: 4px; transition: width 0.4s; }
+
+  /* Settings */
+  .settings-section { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 20px; }
+  .settings-item { padding: 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 15px; }
+  .settings-item:last-child { border-bottom: none; }
+  .settings-item.danger { color: #ff6b6b; }
+  .settings-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; padding: 14px 16px 8px; font-weight: 600; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 400; align-items: flex-end; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--card); border-radius: 20px 20px 0 0; padding: 20px 16px 40px; width: 100%; max-width: 480px; margin: auto; }
+  .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 16px; }
+  .modal input { width: 100%; border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; font-family: inherit; outline: none; }
+  .modal input:focus { border-color: var(--primary); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+  .btn-modal-cancel { flex: 1; background: var(--bg); border: none; border-radius: 10px; padding: 12px; font-size: 15px; cursor: pointer; }
+  .btn-modal-ok { flex: 1; background: var(--primary); color: white; border: none; border-radius: 10px; padding: 12px; font-size: 15px; font-weight: 600; cursor: pointer; }
+
+  /* Timer */
+  .timer-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; align-items: center; justify-content: center; flex-direction: column; }
+  .timer-overlay.open { display: flex; }
+  .timer-display { font-size: 72px; font-weight: 700; color: white; letter-spacing: -2px; }
+  .timer-label { color: rgba(255,255,255,0.6); font-size: 15px; margin-top: 8px; margin-bottom: 40px; }
+  .btn-stop-timer { background: var(--primary); color: white; border: none; border-radius: var(--radius); padding: 14px 40px; font-size: 16px; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- ── Home ── -->
+<div class="page active" id="page-home">
+  <div class="nav">
+    <div class="nav-inner">
+      <div class="nav-title">🏋️ 健身日記</div>
+      <button class="nav-action" onclick="goTo('page-search')">🔍</button>
+    </div>
+  </div>
+  <div style="padding:16px;">
+    <div class="home-header">
+      <h1>今天要練什麼？💪</h1>
+      <p id="today-date"></p>
+    </div>
+    <div class="home-stats">
+      <div class="stat-card"><div class="num" id="stat-total">0</div><div class="label">總訓練次</div></div>
+      <div class="stat-card"><div class="num" id="stat-month">0</div><div class="label">本月次數</div></div>
+      <div class="stat-card"><div class="num" id="stat-sets">0</div><div class="label">累積組數</div></div>
+    </div>
+    <div class="badges-row" id="badges-row"></div>
+    <button class="btn-start" onclick="startWorkout()">＋ 開始訓練</button>
+    <div class="section-title">最近訓練</div>
+    <div class="history-list" id="history-list"></div>
+    <div class="tab-spacer"></div>
+  </div>
+</div>
+
+<!-- ── History ── -->
+<div class="page" id="page-history">
+  <div class="nav">
+    <div class="nav-inner">
+      <div class="nav-title">訓練歷史</div>
+      <button class="nav-action" onclick="goTo('page-search')">🔍</button>
+    </div>
+  </div>
+  <div style="padding:16px;">
+    <div class="history-list" id="full-history-list"></div>
+    <div class="tab-spacer"></div>
+  </div>
+</div>
+
+<!-- ── Stats ── -->
+<div class="page" id="page-stats">
+  <div class="nav">
+    <div class="nav-inner">
+      <div class="nav-title">訓練統計</div>
+    </div>
+  </div>
+  <div style="padding:16px;" id="stats-content">
+    <div class="tab-spacer"></div>
+  </div>
+</div>
+
+<!-- ── Achievements ── -->
+<div class="page" id="page-achievements">
+  <div class="nav">
+    <div class="nav-inner">
+      <div class="nav-title">成就</div>
+    </div>
+  </div>
+  <div style="padding:16px;">
+    <div class="achievement-grid" id="achievement-grid"></div>
+    <div class="tab-spacer"></div>
+  </div>
+</div>
+
+<!-- ── Settings ── -->
+<div class="page" id="page-settings">
+  <div class="nav">
+    <div class="nav-inner">
+      <div class="nav-title">設定</div>
+    </div>
+  </div>
+  <div style="padding:16px;">
+    <div class="settings-label">資料管理</div>
+    <div class="settings-section">
+      <div class="settings-item" onclick="exportData()">
+        <span>匯出訓練資料</span><span>›</span>
+      </div>
+      <div class="settings-item danger" onclick="clearAllData()">
+        <span>清除所有資料</span><span>›</span>
+      </div>
+    </div>
+    <div class="settings-label">自訂動作</div>
+    <div class="settings-section" id="custom-ex-list"></div>
+    <div class="tab-spacer"></div>
+  </div>
+</div>
+
+<!-- ── Body Part ── -->
+<div class="page" id="page-body-part">
+  <div class="nav"><div class="nav-inner">
+    <button class="nav-back" id="body-part-back" onclick="bodyPartBack()">‹</button>
+    <div class="nav-title">選擇部位</div>
+  </div></div>
+  <div style="padding:16px;">
+    <div class="body-grid" id="body-grid"></div>
+    <button class="btn-primary" id="btn-confirm-part" onclick="confirmBodyPart()" disabled>確認</button>
+  </div>
+</div>
+
+<!-- ── Exercise Select ── -->
+<div class="page" id="page-exercise">
+  <div class="nav"><div class="nav-inner">
+    <button class="nav-back" onclick="goTo('page-body-part')">‹</button>
+    <div class="nav-title" id="exercise-page-title">選擇動作</div>
+    <button class="nav-action" onclick="confirmExercises()">加入</button>
+  </div></div>
+  <div style="padding:16px;" id="exercise-list"></div>
+</div>
+
+<!-- ── Workout Logger ── -->
+<div class="page" id="page-workout">
+  <div class="nav"><div class="nav-inner">
+    <div class="nav-title">訓練中</div>
+  </div></div>
+  <div style="padding:16px;">
+    <div class="workout-header">
+      <div>
+        <div style="font-size:12px;color:var(--muted)">訓練時間</div>
+        <div class="workout-timer"><span id="workout-time">00:00</span></div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:12px;color:var(--muted)">總組數</div>
+        <div style="font-size:20px;font-weight:700;" id="total-sets-count">0</div>
+      </div>
+    </div>
+    <div id="exercise-logs"></div>
+    <button class="btn-add-exercise" onclick="addExerciseDuringWorkout()">＋ 新增動作</button>
+    <div class="workout-spacer"></div>
+  </div>
+  <div class="bottom-bar">
+    <button class="btn-cancel" onclick="cancelWorkout()">✕ 取消訓練</button>
+    <button class="btn-finish" id="btn-finish" onclick="finishWorkout()">✓ 完成訓練</button>
+  </div>
+</div>
+
+<!-- ── Search ── -->
+<div class="page" id="page-search">
+  <div class="nav"><div class="nav-inner">
+    <button class="nav-back" onclick="searchBack()">‹</button>
+    <div class="nav-title">搜尋動作記錄</div>
+  </div></div>
+  <div style="padding:16px;">
+    <div class="search-input-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" type="text" id="search-input" placeholder="輸入動作名稱，例：臥推" oninput="renderSearch()">
+    </div>
+    <div id="search-results"></div>
+  </div>
+</div>
+
+<!-- ── History Detail ── -->
+<div class="page" id="page-detail">
+  <div class="nav"><div class="nav-inner">
+    <button class="nav-back" onclick="detailBack()">‹</button>
+    <div class="nav-title">訓練詳情</div>
+    <button class="nav-action" style="color:#ff6b6b" onclick="deleteWorkout()">刪除</button>
+  </div></div>
+  <div style="padding:16px;" id="detail-content"></div>
+</div>
+
+<!-- ── Modal: Custom Exercise ── -->
+<div class="modal-overlay" id="modal-custom">
+  <div class="modal">
+    <div class="modal-title">新增自訂動作</div>
+    <input type="text" id="custom-input" placeholder="動作名稱（例：單槓、藥球深蹲）" maxlength="30">
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-modal-ok" onclick="addCustomExercise()">新增</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Timer Overlay ── -->
+<div class="timer-overlay" id="timer-overlay">
+  <div class="timer-display" id="timer-display">00:00</div>
+  <div class="timer-label">休息計時</div>
+  <button class="btn-stop-timer" onclick="stopRestTimer()">停止</button>
+</div>
+
+<!-- ── Tab Bar ── -->
+<div class="tab-bar" id="tab-bar">
+  <div class="tab-item active" id="tab-home" onclick="switchTab('page-home')">
+    <div class="tab-icon">🏠</div>
+    <div class="tab-label">主頁</div>
+  </div>
+  <div class="tab-item" id="tab-history" onclick="switchTab('page-history')">
+    <div class="tab-icon">📋</div>
+    <div class="tab-label">歷史</div>
+  </div>
+  <div class="tab-item" id="tab-stats" onclick="switchTab('page-stats')">
+    <div class="tab-icon">📊</div>
+    <div class="tab-label">統計</div>
+  </div>
+  <div class="tab-item" id="tab-achievements" onclick="switchTab('page-achievements')">
+    <div class="tab-icon">🏆</div>
+    <div class="tab-label">成就</div>
+  </div>
+  <div class="tab-item" id="tab-settings" onclick="switchTab('page-settings')">
+    <div class="tab-icon">⚙️</div>
+    <div class="tab-label">設定</div>
+  </div>
+</div>
+
+<script>
+// ── Data ──
+const BODY_PARTS = [
+  { id:'chest',    icon:'💪', name:'胸部',   sub:'胸大肌、前三角' },
+  { id:'back',     icon:'🔙', name:'背部',   sub:'背闊肌、菱形肌' },
+  { id:'legs',     icon:'🦵', name:'臀腿',   sub:'股四頭、臀大肌' },
+  { id:'shoulder', icon:'🏔️', name:'肩部',   sub:'三角肌、旋轉肌' },
+  { id:'arms',     icon:'🤸', name:'手臂',   sub:'二頭、三頭' },
+  { id:'core',     icon:'⚡', name:'核心',   sub:'腹直肌、腹斜肌' },
+  { id:'cardio',   icon:'🏃', name:'有氧',   sub:'跑步、跳繩' },
+  { id:'full',     icon:'🔥', name:'全身複合', sub:'壺鈴、藥球、單槓' },
+];
+
+const EXERCISES = {
+  chest:    { traditional: ['臥推','上斜臥推','下斜臥推','飛鳥','伏地挺身','窄距伏地挺身'], machine: ['器械飛鳥','繩索飛鳥','史密斯臥推','胸推機'] },
+  back:     { traditional: ['引體向上','划船','槓鈴划船','硬舉','單臂啞鈴划船','單槓'], machine: ['高拉背機','坐姿划船機','輔助引體向上機','繩索下拉'] },
+  legs:     { traditional: ['深蹲','保加利亞分腿蹲','高腳杯深蹲','羅馬尼亞硬舉','弓步蹲'], machine: ['哈克深蹲','哈克早安式','史密斯深蹲','機械開腿','機械夾腿','繩索後踢'] },
+  shoulder: { traditional: ['肩推','側平舉','前平舉','俯身飛鳥','阿諾推舉'], machine: ['繩索側平舉','繩索前平舉','肩推機','蝴蝶機反向'] },
+  arms:     { traditional: ['槓鈴彎舉','錘式彎舉','三頭撐體','過頭三頭伸展','窄距臥推'], machine: ['繩索彎舉','繩索下壓','牧師椅彎舉','機械彎舉'] },
+  core:     { traditional: ['捲腹','棒式','側棒式','俄羅斯轉體','腿舉','死蟲'], machine: ['繩索捲腹','腹肌機','旋轉機'] },
+  cardio:   { traditional: ['跑步','跳繩','跑步機','單車','橢圓機'], machine: ['划船機','滑雪機','空氣腳踏車'] },
+  full:     { traditional: ['壺鈴擺盪','暴力上槓','土耳其起立','農夫走路','清潔推舉','藥球深蹲','藥球丟擲','藥球旋轉'], machine: ['繩索複合動作'] },
+};
+
+const ACHIEVEMENTS = [
+  { id:'first',   icon:'🌱', name:'第一步',   desc:'完成第一次訓練',       check: (h) => h.length >= 1 },
+  { id:'five',    icon:'🥉', name:'5 次達成',  desc:'累積 5 次訓練',        check: (h) => h.length >= 5 },
+  { id:'twenty',  icon:'🥈', name:'20 次達成', desc:'累積 20 次訓練',       check: (h) => h.length >= 20 },
+  { id:'fifty',   icon:'🥇', name:'50 次達成', desc:'累積 50 次訓練',       check: (h) => h.length >= 50 },
+  { id:'hundred', icon:'💯', name:'百次鬥士',  desc:'累積 100 次訓練',      check: (h) => h.length >= 100 },
+  { id:'variety', icon:'🎯', name:'動作多樣',  desc:'用過 10 種不同動作',   check: (h) => countUniqueExercises(h) >= 10 },
+  { id:'variety2',icon:'🌈', name:'動作大師',  desc:'用過 20 種不同動作',   check: (h) => countUniqueExercises(h) >= 20 },
+  { id:'volume',  icon:'📦', name:'搬山者',    desc:'累積舉起 1,000 kg',    check: (h) => calcTotalVolume(h) >= 1000 },
+  { id:'volume2', icon:'🏔️', name:'移山者',   desc:'累積舉起 10,000 kg',   check: (h) => calcTotalVolume(h) >= 10000 },
+  { id:'month3',  icon:'📅', name:'三月不缺',  desc:'連續三個月都有練',     check: (h) => threeConsecMonths(h) },
+];
+
+function countUniqueExercises(history) {
+  const names = new Set();
+  history.forEach(h => (h.exercises||[]).forEach(ex => names.add(ex.name)));
+  return names.size;
+}
+function calcTotalVolume(history) {
+  let total = 0;
+  history.forEach(h => (h.exercises||[]).forEach(ex => (ex.sets||[]).forEach(s => { total += (s.weight||0) * (s.reps||0); })));
+  return total;
+}
+function threeConsecMonths(history) {
+  const months = new Set(history.map(h => {
+    const d = new Date(h.timestamp);
+    return `${d.getFullYear()}-${d.getMonth()}`;
+  }));
+  if (months.size < 3) return false;
+  const sorted = [...months].sort();
+  for (let i = 0; i < sorted.length - 2; i++) {
+    const [y1, m1] = sorted[i].split('-').map(Number);
+    const [y2, m2] = sorted[i+1].split('-').map(Number);
+    const [y3, m3] = sorted[i+2].split('-').map(Number);
+    const n1 = y1*12+m1, n2 = y2*12+m2, n3 = y3*12+m3;
+    if (n2 === n1+1 && n3 === n2+1) return true;
+  }
+  return false;
+}
+
+// ── State ──
+const TAB_PAGES = ['page-home','page-history','page-stats','page-achievements','page-settings'];
+let currentPage = 'page-home';
+let prevTabPage = 'page-home'; // track which tab page we came from for back nav
+let selectedPart = null;
+let selectedExercises = [];
+let addingExercise = false;
+let workoutData = { exercises: [], startTime: null };
+let workoutTimer = null;
+let restTimerInterval = null;
+let currentDetailId = null;
+
+// ── Storage ──
+function getHistory() { return JSON.parse(localStorage.getItem('fitness_history') || '[]'); }
+function saveHistory(h) { localStorage.setItem('fitness_history', JSON.stringify(h)); }
+function getCustomExercises() { return JSON.parse(localStorage.getItem('custom_exercises') || '{}'); }
+function saveCustomExercises(c) { localStorage.setItem('custom_exercises', JSON.stringify(c)); }
+
+// ── Navigation ──
+function goTo(pageId) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(pageId).classList.add('active');
+  currentPage = pageId;
+
+  const tabBar = document.getElementById('tab-bar');
+  if (TAB_PAGES.includes(pageId)) {
+    tabBar.classList.remove('hidden');
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    const tabId = 'tab-' + pageId.replace('page-', '');
+    const activeTab = document.getElementById(tabId);
+    if (activeTab) activeTab.classList.add('active');
+    prevTabPage = pageId;
+  } else {
+    tabBar.classList.add('hidden');
+  }
+
+  if (pageId === 'page-home') renderHome();
+  if (pageId === 'page-history') renderFullHistory();
+  if (pageId === 'page-stats') renderStats();
+  if (pageId === 'page-achievements') renderAchievements();
+  if (pageId === 'page-settings') renderSettings();
+  if (pageId === 'page-body-part') renderBodyPart();
+  if (pageId === 'page-exercise') renderExercise();
+  if (pageId === 'page-search') { document.getElementById('search-input').value = ''; renderSearch(); }
+  window.scrollTo(0, 0);
+}
+
+function switchTab(pageId) { goTo(pageId); }
+
+function searchBack() { goTo(prevTabPage); }
+function detailBack() { goTo(prevTabPage); }
+
+// ── Home ──
+function renderHome() {
+  const now = new Date();
+  document.getElementById('today-date').textContent = now.toLocaleDateString('zh-TW', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  const history = getHistory();
+  document.getElementById('stat-total').textContent = history.length;
+
+  const thisMonth = now.getMonth(), thisYear = now.getFullYear();
+  document.getElementById('stat-month').textContent = history.filter(h => {
+    const d = new Date(h.timestamp);
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+  }).length;
+
+  const totalSets = history.reduce((a, h) => a + (h.exercises||[]).reduce((b, ex) => b + (ex.sets||[]).length, 0), 0);
+  document.getElementById('stat-sets').textContent = totalSets;
+
+  // Badges
+  const badgesEl = document.getElementById('badges-row');
+  badgesEl.innerHTML = ACHIEVEMENTS.map(a => {
+    const unlocked = a.check(history);
+    return `<div class="badge ${unlocked ? 'unlocked' : 'locked'}" title="${a.desc}">
+      <span class="badge-icon">${a.icon}</span>
+      <div><div class="badge-name">${a.name}</div></div>
+    </div>`;
+  }).join('');
+
+  // Recent 5
+  const list = document.getElementById('history-list');
+  if (history.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">🏋️</div><div>還沒有訓練紀錄<br>開始你的第一次吧！</div></div>';
+    return;
+  }
+  list.innerHTML = history.slice().reverse().slice(0, 5).map(h => historyCardHTML(h)).join('');
+}
+
+function historyCardHTML(h) {
+  const exercises = h.exercises || [];
+  const partIds = [...new Set(exercises.map(ex => ex.partId || h.partId).filter(Boolean))];
+  const partNames = partIds.map(id => { const p = BODY_PARTS.find(b => b.id === id); return p ? p.name : ''; }).filter(Boolean);
+  const icon = partIds.length === 1 ? (BODY_PARTS.find(b => b.id === partIds[0]) || {icon:'🔥'}).icon : '🔥';
+  const displayName = partNames.length > 0 ? partNames.join('・') : '全身訓練';
+  const date = new Date(h.timestamp).toLocaleDateString('zh-TW', { month:'short', day:'numeric', weekday:'short' });
+  const dur = formatDuration(h.duration);
+  const totalSets = exercises.reduce((a,e) => a + (e.sets||[]).length, 0);
+  const vol = exercises.reduce((a,e) => a + (e.sets||[]).reduce((b,s) => b + (s.weight||0)*(s.reps||0), 0), 0);
+  return `<div class="history-card" onclick="showDetail('${h.id}')">
+    <div class="history-icon">${icon}</div>
+    <div class="history-info">
+      <div class="history-date">${date} · ${dur}</div>
+      <div class="history-name">${displayName}</div>
+      <div class="history-meta">${exercises.length} 動作 · ${totalSets} 組${vol > 0 ? ' · ' + vol.toLocaleString() + 'kg' : ''}</div>
+    </div>
+    <div style="color:var(--muted);font-size:20px;">›</div>
+  </div>`;
+}
+
+// ── Full History ──
+function renderFullHistory() {
+  const history = getHistory();
+  const list = document.getElementById('full-history-list');
+  if (history.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="icon">🏋️</div><div>還沒有訓練紀錄</div></div>';
+    return;
+  }
+  list.innerHTML = history.slice().reverse().map(h => historyCardHTML(h)).join('');
+}
+
+// ── Stats ──
+function renderStats() {
+  const history = getHistory();
+  const now = new Date();
+  const thisMonth = now.getMonth(), thisYear = now.getFullYear();
+  const monthCount = history.filter(h => {
+    const d = new Date(h.timestamp);
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+  }).length;
+  const totalSets = history.reduce((a, h) => a + (h.exercises||[]).reduce((b, ex) => b + (ex.sets||[]).length, 0), 0);
+  const totalVol = Math.round(calcTotalVolume(history));
+  const uniqueEx = countUniqueExercises(history);
+
+  // Part breakdown
+  const partCount = {};
+  history.forEach(h => (h.exercises||[]).forEach(ex => {
+    const id = ex.partId || h.partId || 'full';
+    partCount[id] = (partCount[id] || 0) + 1;
+  }));
+  const maxPart = Math.max(...Object.values(partCount), 1);
+  const partBars = BODY_PARTS.map(b => {
+    const c = partCount[b.id] || 0;
+    if (c === 0) return '';
+    const pct = Math.round(c / maxPart * 100);
+    return `<div class="part-bar-row">
+      <div class="part-bar-label"><span>${b.icon} ${b.name}</span><span>${c} 個動作</span></div>
+      <div class="part-bar-track"><div class="part-bar-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('stats-content').innerHTML = `
+    <div class="stats-section">
+      <div class="stats-section-title">總覽</div>
+      <div class="stats-grid">
+        <div class="stats-card"><div class="s-num">${history.length}</div><div class="s-label">總訓練次</div></div>
+        <div class="stats-card"><div class="s-num">${monthCount}</div><div class="s-label">本月次數</div></div>
+        <div class="stats-card"><div class="s-num">${totalSets}</div><div class="s-label">累積組數</div></div>
+        <div class="stats-card"><div class="s-num">${uniqueEx}</div><div class="s-label">動作種類</div></div>
+      </div>
+    </div>
+    <div class="stats-section">
+      <div class="stats-card" style="text-align:center;padding:16px;">
+        <div class="s-num">${totalVol.toLocaleString()}<span style="font-size:16px;font-weight:500;color:var(--muted)"> kg</span></div>
+        <div class="s-label">累積舉起總重量</div>
+      </div>
+    </div>
+    ${partBars ? `<div class="stats-section"><div class="stats-section-title">部位分布</div>${partBars}</div>` : ''}
+    <div class="tab-spacer"></div>
+  `;
+}
+
+// ── Achievements ──
+function renderAchievements() {
+  const history = getHistory();
+  document.getElementById('achievement-grid').innerHTML = ACHIEVEMENTS.map(a => {
+    const unlocked = a.check(history);
+    return `<div class="achievement-card ${unlocked ? 'unlocked' : 'locked'}">
+      <div class="ach-icon">${a.icon}</div>
+      <div class="ach-name">${a.name}</div>
+      <div class="ach-desc">${a.desc}</div>
+      ${unlocked ? '<div class="ach-unlocked-tag">✓ 已解鎖</div>' : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── Settings ──
+function renderSettings() {
+  const customs = getCustomExercises();
+  const parts = Object.entries(customs).filter(([,v]) => v.length > 0);
+  const el = document.getElementById('custom-ex-list');
+  if (parts.length === 0) {
+    el.innerHTML = '<div class="settings-item" style="color:var(--muted);cursor:default;">尚無自訂動作</div>';
+  } else {
+    el.innerHTML = parts.map(([partId, names]) => {
+      const part = BODY_PARTS.find(b => b.id === partId);
+      return names.map(name => `
+        <div class="settings-item">
+          <span>${part ? part.icon : ''} ${name}</span>
+          <span style="color:#ff6b6b;cursor:pointer;" onclick="removeCustomEx('${partId}','${name.replace(/'/g,"\\'")}')">刪除</span>
+        </div>`).join('');
+    }).join('');
+  }
+}
+
+function removeCustomEx(partId, name) {
+  const customs = getCustomExercises();
+  if (customs[partId]) customs[partId] = customs[partId].filter(n => n !== name);
+  saveCustomExercises(customs);
+  renderSettings();
+}
+
+function exportData() {
+  const data = { history: getHistory(), custom: getCustomExercises() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `fitness-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function clearAllData() {
+  if (!confirm('確定要清除所有訓練資料？這個動作無法還原。')) return;
+  localStorage.removeItem('fitness_history');
+  localStorage.removeItem('custom_exercises');
+  goTo('page-home');
+}
+
+// ── Detail ──
+function showDetail(id) {
+  currentDetailId = id;
+  const h = getHistory().find(x => x.id === id);
+  if (!h) return;
+  const exercises = h.exercises || [];
+  const date = new Date(h.timestamp).toLocaleDateString('zh-TW', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
+  const totalSets = exercises.reduce((a,e) => a + (e.sets||[]).length, 0);
+  const partIds = [...new Set(exercises.map(ex => ex.partId || h.partId).filter(Boolean))];
+  const partNames = partIds.map(id => { const p = BODY_PARTS.find(b => b.id === id); return p ? p.name : ''; }).filter(Boolean);
+
+  let html = `<div class="detail-header">
+    <div class="detail-date">${date}</div>
+    <div class="detail-title">🔥 ${partNames.join('・') || '全身訓練'}</div>
+    <div class="detail-meta">
+      <div class="detail-stat"><strong>${formatDuration(h.duration)}</strong>時長</div>
+      <div class="detail-stat"><strong>${exercises.length}</strong>動作</div>
+      <div class="detail-stat"><strong>${totalSets}</strong>組</div>
+    </div>
+  </div>`;
+
+  exercises.forEach(ex => {
+    const part = BODY_PARTS.find(b => b.id === (ex.partId || h.partId));
+    html += `<div class="detail-exercise">
+      <div class="detail-exercise-header">
+        <div class="detail-exercise-name">${ex.name}</div>
+        ${part ? `<span class="exercise-part-tag">${part.name}</span>` : ''}
+      </div>`;
+    (ex.sets||[]).forEach((s,i) => {
+      if (s.isBodyweight) {
+        html += `<div class="set-row"><span class="set-num">第 ${i+1} 組</span><span>自體重 × ${s.reps} 下</span></div>`;
+      } else {
+        html += `<div class="set-row"><span class="set-num">第 ${i+1} 組</span><span>${s.weight}kg × ${s.reps} 下</span></div>`;
+      }
+    });
+    if (ex.note) html += `<div class="detail-note">📝 ${ex.note}</div>`;
+    html += `</div>`;
+  });
+
+  document.getElementById('detail-content').innerHTML = html;
+  goTo('page-detail');
+}
+
+function deleteWorkout() {
+  if (!confirm('確定要刪除這筆訓練紀錄？')) return;
+  saveHistory(getHistory().filter(h => h.id !== currentDetailId));
+  goTo(prevTabPage);
+}
+
+// ── Body Part ──
+function renderBodyPart() {
+  selectedPart = null;
+  document.getElementById('btn-confirm-part').disabled = true;
+  document.getElementById('body-grid').innerHTML = BODY_PARTS.map(b => `
+    <div class="body-card" id="bp-${b.id}" onclick="selectPart('${b.id}')">
+      <div class="icon">${b.icon}</div>
+      <div class="name">${b.name}</div>
+      <div class="sub">${b.sub}</div>
+    </div>
+  `).join('');
+}
+
+function bodyPartBack() {
+  if (addingExercise) goTo('page-workout');
+  else goTo('page-home');
+}
+
+function selectPart(id) {
+  selectedPart = id;
+  document.querySelectorAll('.body-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('bp-' + id).classList.add('selected');
+  document.getElementById('btn-confirm-part').disabled = false;
+}
+
+function confirmBodyPart() {
+  if (!selectedPart) return;
+  selectedExercises = [];
+  goTo('page-exercise');
+}
+
+// ── Exercise Select ──
+function renderExercise() {
+  const part = BODY_PARTS.find(b => b.id === selectedPart);
+  document.getElementById('exercise-page-title').textContent = `選擇動作：${part ? part.name : ''}`;
+  const exList = EXERCISES[selectedPart] || { traditional:[], machine:[] };
+  const customs = getCustomExercises()[selectedPart] || [];
+  let html = '';
+  if (exList.traditional.length) html += renderCategory('傳統 / 自由重量', exList.traditional);
+  if (exList.machine.length) html += renderCategory('器械動作', exList.machine);
+  html += renderCategory('自訂動作', customs, true);
+  document.getElementById('exercise-list').innerHTML = html;
+}
+
+function renderCategory(label, items, isCustom=false) {
+  const chips = items.map(name => {
+    const sel = selectedExercises.includes(name);
+    return `<div class="chip ${sel?'selected':''}" onclick="toggleExercise('${name.replace(/'/g,"\\'")}')">
+      <span>${name}</span><span class="chip-add">${sel?'✓':'+'}</span>
+    </div>`;
+  }).join('');
+  return `<div class="exercise-category">
+    <div class="cat-label">${label}：</div>
+    <div class="exercise-chips">${chips || '<span style="color:var(--muted);font-size:13px;">尚無</span>'}
+    ${isCustom ? `<div class="add-custom" onclick="openModal()">＋ 新增自訂動作</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function toggleExercise(name) {
+  const idx = selectedExercises.indexOf(name);
+  if (idx === -1) selectedExercises.push(name);
+  else selectedExercises.splice(idx, 1);
+  renderExercise();
+}
+
+function openModal() {
+  document.getElementById('modal-custom').classList.add('open');
+  document.getElementById('custom-input').value = '';
+  setTimeout(() => document.getElementById('custom-input').focus(), 100);
+}
+function closeModal() { document.getElementById('modal-custom').classList.remove('open'); }
+
+function addCustomExercise() {
+  const val = document.getElementById('custom-input').value.trim();
+  if (!val) return;
+  const customs = getCustomExercises();
+  if (!customs[selectedPart]) customs[selectedPart] = [];
+  if (!customs[selectedPart].includes(val)) customs[selectedPart].push(val);
+  saveCustomExercises(customs);
+  selectedExercises.push(val);
+  closeModal();
+  renderExercise();
+}
+
+function confirmExercises() {
+  if (selectedExercises.length === 0) { alert('請至少選一個動作'); return; }
+  const newExercises = selectedExercises.map(name => ({
+    name,
+    partId: selectedPart,
+    sets: [{ weight: 0, reps: 10 }],
+    note: '',
+  }));
+  workoutData.exercises.push(...newExercises);
+  addingExercise = false;
+  renderExerciseLogs();
+  goTo('page-workout');
+}
+
+// ── Workout ──
+function startWorkout() {
+  workoutData = { exercises: [], startTime: Date.now() };
+  startWorkoutTimer();
+  renderExerciseLogs();
+  goTo('page-workout');
+}
+
+function addExerciseDuringWorkout() {
+  addingExercise = true;
+  selectedPart = null;
+  selectedExercises = [];
+  goTo('page-body-part');
+}
+
+function renderExerciseLogs() {
+  let totalSets = 0;
+  const logs = workoutData.exercises.map((ex, ei) => {
+    totalSets += ex.sets.length;
+    const part = BODY_PARTS.find(b => b.id === ex.partId);
+    const rows = ex.sets.map((s, si) => {
+      if (s.isBodyweight) {
+        return `<tr>
+          <td>${si+1}</td>
+          <td><div style="font-size:13px;color:var(--muted)">自體重</div></td>
+          <td><div class="num-input">
+            <button class="num-btn" onclick="changeVal(${ei},${si},'reps',-1)">−</button>
+            <div class="num-val">${s.reps}</div>
+            <button class="num-btn" onclick="changeVal(${ei},${si},'reps',1)">＋</button>
+          </div></td>
+          <td><button class="timer-btn" onclick="startRestTimer()">⏱</button></td>
+        </tr>`;
+      }
+      return `<tr>
+        <td>${si+1}</td>
+        <td><div class="num-input">
+          <button class="num-btn" onclick="changeVal(${ei},${si},'weight',-2.5)">−</button>
+          <div class="num-val">${s.weight}</div>
+          <button class="num-btn" onclick="changeVal(${ei},${si},'weight',2.5)">＋</button>
+        </div></td>
+        <td><div class="num-input">
+          <button class="num-btn" onclick="changeVal(${ei},${si},'reps',-1)">−</button>
+          <div class="num-val">${s.reps}</div>
+          <button class="num-btn" onclick="changeVal(${ei},${si},'reps',1)">＋</button>
+        </div></td>
+        <td><button class="timer-btn" onclick="startRestTimer()">⏱</button></td>
+      </tr>`;
+    }).join('');
+
+    const noteVal = (ex.note || '').replace(/"/g, '&quot;');
+    const hasNote = !!ex.note;
+
+    return `<div class="exercise-log">
+      <div class="exercise-log-header">
+        <div class="exercise-log-name">${ex.name}</div>
+        ${part ? `<span class="exercise-part-tag">${part.name}</span>` : ''}
+        <button class="btn-delete" onclick="removeExercise(${ei})">🗑</button>
+      </div>
+      <table class="sets-table" style="width:100%">
+        <thead><tr>
+          <th style="font-size:11px;color:var(--muted);text-align:left;padding-bottom:8px;width:30px;">組</th>
+          <th style="font-size:11px;color:var(--muted);text-align:center;padding-bottom:8px;">重量 (kg)</th>
+          <th style="font-size:11px;color:var(--muted);text-align:center;padding-bottom:8px;">次數</th>
+          <th style="font-size:11px;color:var(--muted);text-align:center;padding-bottom:8px;width:40px;">計時</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="sets-actions">
+        <button class="sets-link muted" onclick="addBodyweightSet(${ei})">＋ 自體重組</button>
+        <button class="sets-link muted" onclick="removeSet(${ei})">－ 減少組數</button>
+        <button class="sets-link" onclick="addSet(${ei})">＋ 新增組數</button>
+      </div>
+      <button class="note-toggle" onclick="toggleNote(${ei})">📝 ${hasNote ? '備註' : '新增備註'}</button>
+      <textarea class="note-area" id="note-${ei}" placeholder="例：紅色彈力帶輔助 / 棒式 1分鐘 / 藥球 3kg" style="${hasNote ? '' : 'display:none'}" onchange="updateNote(${ei})">${noteVal}</textarea>
+    </div>`;
+  }).join('');
+
+  document.getElementById('exercise-logs').innerHTML = logs || '<div style="text-align:center;color:var(--muted);padding:40px 0;font-size:14px;">按下「新增動作」開始記錄</div>';
+  document.getElementById('total-sets-count').textContent = totalSets;
+}
+
+function toggleNote(ei) {
+  const area = document.getElementById(`note-${ei}`);
+  if (area.style.display === 'none') {
+    area.style.display = 'block';
+    area.focus();
+  } else {
+    area.style.display = 'none';
+  }
+}
+function updateNote(ei) {
+  workoutData.exercises[ei].note = document.getElementById(`note-${ei}`).value;
+}
+
+function changeVal(ei, si, key, delta) {
+  const s = workoutData.exercises[ei].sets[si];
+  if (key === 'weight') {
+    s.weight = Math.max(0, Math.round((s.weight + delta) * 10) / 10);
+  } else {
+    s.reps = Math.max(0, s.reps + delta);
+  }
+  renderExerciseLogs();
+}
+
+function addSet(ei) {
+  const sets = workoutData.exercises[ei].sets;
+  const last = sets[sets.length - 1] || { weight:0, reps:10 };
+  sets.push({ ...last });
+  renderExerciseLogs();
+}
+function addBodyweightSet(ei) {
+  workoutData.exercises[ei].sets.push({ isBodyweight: true, weight: 0, reps: 10 });
+  renderExerciseLogs();
+}
+function removeSet(ei) {
+  const sets = workoutData.exercises[ei].sets;
+  if (sets.length > 1) sets.pop();
+  renderExerciseLogs();
+}
+function removeExercise(ei) {
+  workoutData.exercises.splice(ei, 1);
+  renderExerciseLogs();
+}
+
+// ── Timers ──
+function startWorkoutTimer() {
+  clearInterval(workoutTimer);
+  workoutTimer = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - workoutData.startTime) / 1000);
+    const el = document.getElementById('workout-time');
+    if (el) el.textContent = formatTime(elapsed);
+  }, 1000);
+}
+
+function startRestTimer() {
+  let secs = 0;
+  document.getElementById('timer-overlay').classList.add('open');
+  clearInterval(restTimerInterval);
+  restTimerInterval = setInterval(() => {
+    secs++;
+    document.getElementById('timer-display').textContent = formatTime(secs);
+  }, 1000);
+  document.getElementById('timer-display').textContent = '00:00';
+}
+function stopRestTimer() {
+  clearInterval(restTimerInterval);
+  document.getElementById('timer-overlay').classList.remove('open');
+}
+
+function cancelWorkout() {
+  if (!confirm('確定要取消這次訓練？')) return;
+  clearInterval(workoutTimer);
+  clearInterval(restTimerInterval);
+  workoutData = { exercises: [], startTime: null };
+  addingExercise = false;
+  goTo('page-home');
+}
+
+// ── Finish & Sync ──
+const WORKER_URL = 'https://tiny-sea-381f.aniki715.workers.dev/';
+
+async function syncToNotion(record) {
+  const exercises = record.exercises || [];
+  const totalSets = exercises.reduce((a, e) => a + (e.sets||[]).length, 0);
+  const partIds = [...new Set(exercises.map(ex => ex.partId).filter(Boolean))];
+  const partNames = partIds.map(id => { const p = BODY_PARTS.find(b => b.id === id); return p ? p.name : id; });
+  const detail = exercises.map(ex => {
+    const part = BODY_PARTS.find(b => b.id === ex.partId);
+    const setsStr = (ex.sets||[]).map((s,i) =>
+      s.isBodyweight ? `第${i+1}組 自體重×${s.reps}` : `第${i+1}組 ${s.weight}kg×${s.reps}`
+    ).join('、');
+    const noteStr = ex.note ? ` (${ex.note})` : '';
+    return `[${part ? part.name : ''}] ${ex.name}${noteStr}：${setsStr}`;
+  }).join('\n');
+  const date = new Date(record.timestamp).toISOString().slice(0, 10);
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: `${partNames.join('・') || '全身'} · ${date}`,
+        date,
+        part: partNames.join('、') || '全身',
+        exerciseCount: exercises.length,
+        totalSets,
+        durationMin: Math.round(record.duration / 60),
+        detail
+      })
+    });
+    return res.ok;
+  } catch(e) { return false; }
+}
+
+async function finishWorkout() {
+  if (workoutData.exercises.length === 0) { alert('還沒有記錄任何動作'); return; }
+  workoutData.exercises.forEach((ex, ei) => {
+    const el = document.getElementById(`note-${ei}`);
+    if (el) ex.note = el.value;
+  });
+  clearInterval(workoutTimer);
+  const duration = Math.floor((Date.now() - workoutData.startTime) / 1000);
+  const record = {
+    id: Date.now().toString(),
+    timestamp: Date.now(),
+    duration,
+    exercises: workoutData.exercises,
+  };
+  const history = getHistory();
+  history.push(record);
+  saveHistory(history);
+
+  const btn = document.getElementById('btn-finish');
+  if (btn) { btn.textContent = '同步中…'; btn.disabled = true; }
+  const ok = await syncToNotion(record);
+  if (btn) { btn.textContent = ok ? '✓ 已同步 Notion' : '✓ 完成（未同步）'; }
+
+  setTimeout(() => {
+    workoutData = { exercises: [], startTime: null };
+    addingExercise = false;
+    if (btn) { btn.textContent = '✓ 完成訓練'; btn.disabled = false; }
+    goTo('page-home');
+  }, 1200);
+}
+
+// ── Search ──
+function renderSearch() {
+  const query = document.getElementById('search-input').value.trim();
+  const container = document.getElementById('search-results');
+  if (!query) {
+    container.innerHTML = '<div class="search-empty">輸入動作名稱<br>查看歷史紀錄和重量</div>';
+    return;
+  }
+  const history = getHistory();
+  const results = [];
+  history.forEach(h => {
+    (h.exercises||[]).forEach(ex => {
+      if (ex.name.includes(query)) {
+        results.push({ date: h.timestamp, ex, workoutId: h.id, partId: ex.partId || h.partId });
+      }
+    });
+  });
+  results.sort((a,b) => b.date - a.date);
+  if (results.length === 0) {
+    container.innerHTML = `<div class="search-empty">找不到「${query}」的紀錄</div>`;
+    return;
+  }
+  container.innerHTML = results.map(r => {
+    const part = BODY_PARTS.find(b => b.id === r.partId);
+    const date = new Date(r.date).toLocaleDateString('zh-TW', { year:'numeric', month:'short', day:'numeric', weekday:'short' });
+    const setsStr = (r.ex.sets||[]).map((s,i) =>
+      s.isBodyweight ? `第${i+1}組 自體重×${s.reps}` : `第${i+1}組 ${s.weight}kg×${s.reps}`
+    ).join(' · ');
+    const note = r.ex.note ? `<div class="search-result-note">📝 ${r.ex.note}</div>` : '';
+    return `<div class="search-result" onclick="showDetail('${r.workoutId}')">
+      <div class="search-result-name">
+        ${r.ex.name}
+        ${part ? `<span class="exercise-part-tag">${part.name}</span>` : ''}
+      </div>
+      <div class="search-result-date">${date}</div>
+      <div class="search-result-sets">${setsStr}</div>
+      ${note}
+    </div>`;
+  }).join('');
+}
+
+// ── Utils ──
+function formatTime(secs) {
+  const m = Math.floor(secs/60), s = secs%60;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function formatDuration(secs) {
+  if (!secs) return '--';
+  if (secs < 60) return `${secs}秒`;
+  const m = Math.floor(secs/60);
+  return m >= 60 ? `${Math.floor(m/60)}小時${m%60}分` : `${m}分鐘`;
+}
+
+renderHome();
+</script>
+</body>
+</html>
