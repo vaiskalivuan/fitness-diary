@@ -115,6 +115,8 @@
   .exercise-log-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
   .exercise-log-name { font-size: 16px; font-weight: 800; flex: 1; }
   .exercise-part-tag { font-size: 10px; background: var(--lime); color: var(--text); border: 1.5px solid var(--border); border-radius: 10px; padding: 2px 8px; font-weight: 700; flex-shrink: 0; }
+  .sets-table td { padding: 10px 4px; }
+  .sets-table tbody tr:not(:first-child) td { border-top: 1.5px dashed var(--border); }
   .btn-delete { background: none; border: none; font-size: 16px; cursor: pointer; padding: 4px; color: var(--muted); }
   .num-input { display: flex; align-items: center; gap: 8px; justify-content: center; }
   .num-btn { width: 30px; height: 30px; background: var(--bg); border: 2px solid var(--border); border-radius: 8px; font-size: 18px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; }
@@ -873,10 +875,24 @@ function showDetail(id) {
   goTo('page-detail');
 }
 
-function deleteWorkout() {
+async function deleteWorkout() {
   if (!confirm('確定要刪除這筆訓練紀錄？')) return;
-  saveHistory(getHistory().filter(h => h.id !== currentDetailId));
+  const h = getHistory();
+  const w = h.find(x => x.id === currentDetailId);
+  saveHistory(h.filter(x => x.id !== currentDetailId));
   deleteFromSupabase(currentDetailId);
+  if (w?.notionPageId) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 10000);
+      await fetch(WORKER_URL, {
+        method: 'DELETE', signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId: w.notionPageId })
+      });
+      clearTimeout(tid);
+    } catch (e) {}
+  }
   goTo(prevTabPage);
 }
 
