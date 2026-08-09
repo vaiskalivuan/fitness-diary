@@ -439,6 +439,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ── Data ──
 const BODY_PARTS = [
@@ -873,6 +874,7 @@ function showDetail(id) {
 function deleteWorkout() {
   if (!confirm('確定要刪除這筆訓練紀錄？')) return;
   saveHistory(getHistory().filter(h => h.id !== currentDetailId));
+  deleteFromSupabase(currentDetailId);
   goTo(prevTabPage);
 }
 
@@ -1163,6 +1165,45 @@ function cancelWorkout() {
 // ── Finish & Sync ──
 const WORKER_URL = 'https://tiny-sea-381f.aniki715.workers.dev/';
 
+// ── Supabase Backup ──
+const SUPABASE_URL = 'https://gnggoydgrmdimtmkjjof.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_Mnws--Zgj4xIcPVdd51GNg_VcXgREZg';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+async function syncToSupabase(record) {
+  try {
+    const { error } = await sb.from('workouts').upsert({
+      id: record.id,
+      timestamp: record.timestamp,
+      duration: record.duration,
+      exercises: record.exercises,
+      notion_page_id: record.notionPageId || null,
+    });
+    if (error) { console.error('syncToSupabase failed', error); return false; }
+    return true;
+  } catch(e) { console.error('syncToSupabase error', e); return false; }
+}
+
+async function deleteFromSupabase(id) {
+  try { await sb.from('workouts').delete().eq('id', id); } catch(e) {}
+}
+
+async function loadFromSupabaseAndMerge() {
+  try {
+    const { data, error } = await sb.from('workouts').select('*');
+    if (error || !data) { if (error) console.error('loadFromSupabase failed', error); return; }
+    const remote = data.map(r => ({
+      id: r.id, timestamp: r.timestamp, duration: r.duration,
+      exercises: r.exercises, notionPageId: r.notion_page_id || undefined,
+    }));
+    const local = getHistory();
+    const localIds = new Set(local.map(h => h.id));
+    const merged = [...local, ...remote.filter(r => !localIds.has(r.id))];
+    merged.sort((a,b) => a.timestamp - b.timestamp);
+    saveHistory(merged);
+  } catch(e) { console.error('loadFromSupabaseAndMerge error', e); }
+}
+
 async function syncToNotion(record) {
   const exercises = record.exercises || [];
   const totalSets = exercises.reduce((a, e) => a + (e.sets||[]).length, 0);
@@ -1243,6 +1284,7 @@ async function finishWorkout() {
       history[idx].exercises = workoutData.exercises;
       history[idx].duration = duration;
       saveHistory(history);
+      syncToSupabase(history[idx]);
     }
     workoutData = { exercises: [], startTime: null };
     editMode = false;
@@ -1267,7 +1309,10 @@ async function finishWorkout() {
   let ok = false;
   if (getNotionSync()) {
     if (btn) { btn.textContent = '同步中…'; btn.disabled = true; }
-    ok = await syncToNotion(record);
+    const [notionOk] = await Promise.all([syncToNotion(record), syncToSupabase(record)]);
+    ok = notionOk;
+  } else {
+    await syncToSupabase(record);
   }
   if (btn) { btn.textContent = ok ? '✓ 已同步 Notion' : '✓ 完成'; }
 
@@ -1333,6 +1378,9 @@ function formatDuration(secs) {
 }
 
 renderHome();
+loadFromSupabaseAndMerge().then(() => {
+  if (currentPage === 'page-home') renderHome();
+});
 </script>
 </body>
 </html>
