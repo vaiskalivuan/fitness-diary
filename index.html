@@ -1206,9 +1206,13 @@ async function loadFromSupabaseAndMerge() {
     }));
     const local = getHistory();
     const localIds = new Set(local.map(h => h.id));
+    const remoteIds = new Set(remote.map(r => r.id));
     const merged = [...local, ...remote.filter(r => !localIds.has(r.id))];
     merged.sort((a,b) => a.timestamp - b.timestamp);
     saveHistory(merged);
+    // 本機有、Supabase 還沒有的紀錄（例如換裝置前累積的舊資料），自動補推上去
+    const localOnly = local.filter(h => !remoteIds.has(h.id));
+    for (const r of localOnly) { await syncToSupabase(r); }
   } catch(e) { console.error('loadFromSupabaseAndMerge error', e); }
 }
 
