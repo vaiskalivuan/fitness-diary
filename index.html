@@ -801,12 +801,14 @@ function importData(event) {
       const incoming = Array.isArray(data) ? data : (data.history || []);
       const existing = getHistory();
       const existingIds = new Set(existing.map(h => h.id));
-      const merged = [...existing, ...incoming.filter(h => !existingIds.has(h.id))];
+      const newRecords = incoming.filter(h => !existingIds.has(h.id));
+      const merged = [...existing, ...newRecords];
       merged.sort((a, b) => a.timestamp - b.timestamp);
       saveHistory(merged);
       if (!Array.isArray(data) && data.custom) saveCustomExercises(data.custom);
-      alert(`匯入完成！新增 ${merged.length - existing.length} 筆訓練。`);
+      alert(`匯入完成！新增 ${newRecords.length} 筆訓練，正在補同步到 Supabase…`);
       renderSettings();
+      backfillSupabase(newRecords);
     } catch {
       alert('檔案格式錯誤，請確認是正確的 JSON 備份檔。');
     }
@@ -1186,6 +1188,12 @@ async function syncToSupabase(record) {
 
 async function deleteFromSupabase(id) {
   try { await sb.from('workouts').delete().eq('id', id); } catch(e) {}
+}
+
+async function backfillSupabase(records) {
+  for (const r of records) {
+    await syncToSupabase(r);
+  }
 }
 
 async function loadFromSupabaseAndMerge() {
