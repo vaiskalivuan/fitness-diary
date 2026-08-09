@@ -115,6 +115,7 @@
   .num-input { display: flex; align-items: center; gap: 8px; justify-content: center; }
   .num-btn { width: 30px; height: 30px; background: var(--bg); border: 1.5px solid var(--border); border-radius: 8px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .num-val { font-size: 17px; font-weight: 700; min-width: 36px; text-align: center; }
+  .num-val.tappable { cursor: pointer; border-bottom: 1.5px dashed var(--border); padding-bottom: 1px; }
   .timer-btn { background: none; border: 1.5px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 16px; cursor: pointer; }
   .sets-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .sets-link { background: none; border: none; font-size: 13px; color: var(--primary); cursor: pointer; padding: 4px 0; }
@@ -964,7 +965,7 @@ function renderExerciseLogs() {
           <td><div style="font-size:13px;color:var(--muted)">自體重</div></td>
           <td><div class="num-input">
             <button class="num-btn" onclick="changeVal(${ei},${si},'reps',-1)">−</button>
-            <div class="num-val">${s.reps}</div>
+            <div class="num-val tappable" onclick="promptVal(${ei},${si},'reps')">${s.reps}</div>
             <button class="num-btn" onclick="changeVal(${ei},${si},'reps',1)">＋</button>
           </div></td>
           <td><button class="timer-btn" onclick="startRestTimer()">⏱</button></td>
@@ -974,12 +975,12 @@ function renderExerciseLogs() {
         <td>${si+1}</td>
         <td><div class="num-input">
           <button class="num-btn" onclick="changeVal(${ei},${si},'weight',-2.5)">−</button>
-          <div class="num-val">${s.weight}</div>
+          <div class="num-val tappable" onclick="promptVal(${ei},${si},'weight')">${s.weight}</div>
           <button class="num-btn" onclick="changeVal(${ei},${si},'weight',2.5)">＋</button>
         </div></td>
         <td><div class="num-input">
           <button class="num-btn" onclick="changeVal(${ei},${si},'reps',-1)">−</button>
-          <div class="num-val">${s.reps}</div>
+          <div class="num-val tappable" onclick="promptVal(${ei},${si},'reps')">${s.reps}</div>
           <button class="num-btn" onclick="changeVal(${ei},${si},'reps',1)">＋</button>
         </div></td>
         <td><button class="timer-btn" onclick="startRestTimer()">⏱</button></td>
@@ -1007,6 +1008,7 @@ function renderExerciseLogs() {
       <div class="sets-actions">
         <button class="sets-link muted" onclick="addBodyweightSet(${ei})">＋ 自體重組</button>
         <button class="sets-link muted" onclick="removeSet(${ei})">－ 減少組數</button>
+        <button class="sets-link" onclick="promptSetCount(${ei})">組數：${ex.sets.length}</button>
         <button class="sets-link" onclick="addSet(${ei})">＋ 新增組數</button>
       </div>
       <button class="note-toggle" onclick="toggleNote(${ei})">📝 ${hasNote ? '備註' : '新增備註'}</button>
@@ -1037,6 +1039,32 @@ function changeVal(ei, si, key, delta) {
     s.weight = Math.max(0, Math.round((s.weight + delta) * 10) / 10);
   } else {
     s.reps = Math.max(0, s.reps + delta);
+  }
+  renderExerciseLogs();
+}
+
+function promptVal(ei, si, key) {
+  const s = workoutData.exercises[ei].sets[si];
+  const label = key === 'weight' ? '輸入重量 (kg)' : '輸入次數';
+  const val = prompt(label, s[key]);
+  if (val === null) return;
+  const num = parseFloat(val);
+  if (isNaN(num) || num < 0) return;
+  s[key] = key === 'weight' ? Math.round(num * 10) / 10 : Math.round(num);
+  renderExerciseLogs();
+}
+
+function promptSetCount(ei) {
+  const sets = workoutData.exercises[ei].sets;
+  const val = prompt('輸入總組數', sets.length);
+  if (val === null) return;
+  const num = parseInt(val, 10);
+  if (isNaN(num) || num < 1) return;
+  if (num > sets.length) {
+    const last = sets[sets.length - 1] || { weight:0, reps:10 };
+    while (sets.length < num) sets.push({ ...last });
+  } else if (num < sets.length) {
+    sets.length = num;
   }
   renderExerciseLogs();
 }
