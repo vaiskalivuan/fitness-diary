@@ -168,6 +168,19 @@
   .stats-card { background: var(--card); border: 2.5px solid var(--border); border-radius: var(--radius); padding: 16px 14px; text-align: center; box-shadow: var(--shadow); }
   .stats-card .s-num { font-size: 28px; font-weight: 800; color: var(--text); }
   .stats-card .s-label { font-size: 12px; color: var(--muted); margin-top: 4px; font-weight: 700; }
+  .prog-controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .prog-select { width: 100%; background: var(--card); color: var(--text); border: 2.5px solid var(--border); border-radius: 12px; padding: 10px 12px; font-size: 15px; font-weight: 800; box-shadow: var(--shadow-sm); }
+  .prog-tabs { display: flex; gap: 8px; }
+  .prog-tab { flex: 1; background: var(--card); border: 2px solid var(--border); border-radius: 10px; padding: 8px 4px; font-size: 13px; font-weight: 800; cursor: pointer; color: var(--text); }
+  .prog-tab.active { background: var(--lime); box-shadow: 2px 2px 0 var(--border); }
+  .prog-card { background: var(--card); border: 2.5px solid var(--border); border-radius: var(--radius); padding: 14px 12px 12px; box-shadow: var(--shadow); }
+  .prog-summary { display: flex; justify-content: space-between; align-items: baseline; padding: 0 4px 8px; }
+  .prog-summary .big { font-size: 26px; font-weight: 800; }
+  .prog-summary .big small { font-size: 13px; color: var(--muted); font-weight: 700; }
+  .prog-summary .delta { font-size: 13px; font-weight: 800; }
+  .prog-readout { min-height: 20px; font-size: 12px; font-weight: 700; color: var(--muted); padding: 6px 4px 0; }
+  .prog-pt { cursor: pointer; }
+  .prog-empty { text-align: center; color: var(--muted); font-weight: 600; font-size: 13px; padding: 28px 12px; }
   .part-bar-row { background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; box-shadow: var(--shadow-sm); }
   .part-bar-label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; font-weight: 700; }
   .part-bar-track { background: var(--bg); border: 1.5px solid var(--border); border-radius: 4px; height: 8px; overflow: hidden; }
@@ -721,9 +734,90 @@ function renderStats() {
         <div class="s-label">累積舉起總重量</div>
       </div>
     </div>
+    <div class="stats-section"><div class="stats-section-title">動作進步</div><div id="progress-box"></div></div>
     ${partBars ? `<div class="stats-section"><div class="stats-section-title">部位分布</div>${partBars}</div>` : ''}
     <div class="tab-spacer"></div>
   `;
+  renderProgress();
+}
+
+// ── Exercise progress ──
+let progressEx = null, progressMetric = 'max';
+const PROGRESS_METRICS = {
+  max: { label: '最大重量', unit: 'kg' },
+  e1rm: { label: '預估 1RM', unit: 'kg' },
+  vol: { label: '總容量', unit: 'kg' },
+};
+function escHtml(t) { return String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function getExerciseProgress(history, name) {
+  const pts = [];
+  history.slice().sort((a, b) => a.timestamp - b.timestamp).forEach(h => {
+    let max = 0, e1rm = 0, vol = 0, sets = 0;
+    (h.exercises || []).filter(ex => ex.name === name).forEach(ex => (ex.sets || []).forEach(st => {
+      const w = st.weight || 0, r = st.reps || 0;
+      if (st.isBodyweight || w <= 0 || r <= 0) return;
+      sets++;
+      max = Math.max(max, w);
+      e1rm = Math.max(e1rm, w * (1 + r / 30));
+      vol += w * r;
+    }));
+    if (sets > 0) pts.push({ t: h.timestamp, max, e1rm: Math.round(e1rm * 10) / 10, vol: Math.round(vol) });
+  });
+  return pts;
+}
+function setProgressEx(name) { progressEx = name; renderProgress(); }
+function setProgressMetric(m) { progressMetric = m; renderProgress(); }
+function showProgressPoint(i) {
+  const el = document.getElementById('prog-readout');
+  const pts = window._progPts || [];
+  if (!el || !pts[i]) return;
+  const p = pts[i], m = PROGRESS_METRICS[progressMetric];
+  const d = new Date(p.t).toLocaleDateString('zh-TW', { year:'numeric', month:'numeric', day:'numeric' });
+  el.textContent = `${d} · ${m.label} ${p[progressMetric]} ${m.unit}${p.isPR ? ' · 新紀錄' : ''}`;
+}
+function renderProgress() {
+  const box = document.getElementById('progress-box');
+  if (!box) return;
+  const history = getHistory();
+  const counts = {};
+  history.forEach(h => new Set((h.exercises || []).map(ex => ex.name)).forEach(n => { counts[n] = (counts[n] || 0) + 1; }));
+  const names = Object.keys(counts).filter(n => getExerciseProgress(history, n).length > 0).sort((a, b) => counts[b] - counts[a]);
+  if (names.length === 0) { box.innerHTML = '<div class="prog-card"><div class="prog-empty">還沒有帶重量的訓練紀錄</div></div>'; return; }
+  if (!progressEx || !names.includes(progressEx)) progressEx = names[0];
+  const pts = getExerciseProgress(history, progressEx);
+  const key = progressMetric, m = PROGRESS_METRICS[key];
+  let best = -1;
+  pts.forEach(p => { p.isPR = p[key] > best; if (p.isPR) best = p[key]; });
+  window._progPts = pts;
+
+  const first = pts[0][key], last = pts[pts.length - 1][key];
+  const diff = Math.round((last - first) * 10) / 10;
+  const deltaTxt = pts.length < 2 ? '再練一次就能看到變化' : `${diff > 0 ? '+' : ''}${diff} kg（${pts.length} 次）`;
+
+  const W = 320, H = 170, L = 36, R = 12, T = 14, B = 26;
+  const vals = pts.map(p => p[key]);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (hi === lo) { lo = Math.max(0, lo - 5); hi = hi + 5; }
+  const pad = (hi - lo) * 0.15; lo = Math.max(0, lo - pad); hi = hi + pad;
+  const x = i => pts.length === 1 ? (L + W - R) / 2 : L + (W - L - R) * i / (pts.length - 1);
+  const y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  const ticks = [lo, (lo + hi) / 2, hi].map(v => Math.round(v));
+  const grid = ticks.map(v => `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="#141414" stroke-opacity="0.12" stroke-width="1"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" font-weight="700" fill="#6b6b62">${v}</text>`).join('');
+  const fmt = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()}`; };
+  const xLabels = (pts.length === 1 ? [0] : [0, pts.length - 1]).map((i, k, a) => `<text x="${x(i)}" y="${H - 8}" text-anchor="${a.length === 1 ? 'middle' : (k === 0 ? 'start' : 'end')}" font-size="10" font-weight="700" fill="#6b6b62">${fmt(pts[i].t)}</text>`).join('');
+  const line = pts.length > 1 ? `<polyline points="${pts.map((p, i) => `${x(i)},${y(p[key])}`).join(' ')}" fill="none" stroke="#141414" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : '';
+  const dots = pts.map((p, i) => `<g class="prog-pt" onclick="showProgressPoint(${i})"><circle cx="${x(i)}" cy="${y(p[key])}" r="14" fill="transparent"/><circle cx="${x(i)}" cy="${y(p[key])}" r="${p.isPR ? 6 : 4.5}" fill="${p.isPR ? '#D7FF3E' : '#ffffff'}" stroke="#141414" stroke-width="2"/></g>`).join('');
+
+  box.innerHTML = `
+    <div class="prog-controls">
+      <select class="prog-select" onchange="setProgressEx(this.value)">${names.map(n => `<option value="${escHtml(n)}"${n === progressEx ? ' selected' : ''}>${escHtml(n)}（${counts[n]} 次）</option>`).join('')}</select>
+      <div class="prog-tabs">${Object.keys(PROGRESS_METRICS).map(k => `<button class="prog-tab${k === key ? ' active' : ''}" onclick="setProgressMetric('${k}')">${PROGRESS_METRICS[k].label}</button>`).join('')}</div>
+    </div>
+    <div class="prog-card">
+      <div class="prog-summary"><div class="big">${last}<small> ${m.unit}</small></div><div class="delta">${deltaTxt}</div></div>
+      <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${escHtml(progressEx)} ${m.label}變化">${grid}${xLabels}${line}${dots}</svg>
+      <div class="prog-readout" id="prog-readout">點圖上的點看當次數字；大點為新紀錄</div>
+    </div>`;
 }
 
 // ── Achievements ──
